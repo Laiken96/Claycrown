@@ -40,6 +40,10 @@ export class AI {
       else if (e.cls === 'b') { blds.push(e); (by[e.type] ||= []).push(e); }
     }
     this.by = by;
+    if (this.s.scoutId && !this.s.scoutDone) {
+      const i = army.findIndex(u => u.id === this.s.scoutId);
+      if (i >= 0) army.splice(i, 1);
+    }
     this.armySize = army.length; this.workers = workers.length;
     const keep = (by.keep || []).find(b => b.done) || (by.keep || [])[0];
     const anchor = keep || blds[0] || workers[0] || army[0];
@@ -54,6 +58,7 @@ export class AI {
     this.reserve = {};
     if (nextKey && !aging && W >= c.ageWorkers[p.age] - 3) this.reserve = { ...TECHS[nextKey].cost };
 
+    this.scout(army);
     this.defend(army);
 
     // Arbeiter ausbilden
@@ -214,6 +219,7 @@ export class AI {
     for (let r = 4; r <= 26; r++) {
       for (let y = Math.floor(h.y) - r; y <= Math.floor(h.y) + r; y++) for (let x = Math.floor(h.x) - r; x <= Math.floor(h.x) + r; x++) {
         if (Math.abs(x - Math.floor(h.x)) !== r && Math.abs(y - Math.floor(h.y)) !== r) continue;
+        if (!g.inb(x, y) || !g.explored(this.pid, x, y)) continue;
         const e = g.entAt(x, y);
         if (!e || e.cls !== 'r' || e.kind !== 'tree' || !g.treeReachable(e)) continue;
         if (camps.some(c => Math.hypot(c.x - e.x, c.y - e.y) < 9)) continue;
@@ -229,15 +235,51 @@ export class AI {
   }
 
   enemyHome() {
-    const g = this.g;
     let best = null, bd = 1e9;
-    for (const p of g.players) {
-      if (p.id === this.pid || p.defeated) continue;
-      const s = g.spawns[p.id];
+    for (const s of this.guessSpawns()) {
       const d = Math.hypot(s.x - this.home.x, s.y - this.home.y);
       if (d < bd) { bd = d; best = s; }
     }
     return best;
+  }
+
+  // Die Startplätze liegen symmetrisch um die Kartenmitte. Aus dem eigenen Startplatz
+  // und der Spielerzahl lassen sich die anderen ableiten, ohne sie zu kennen.
+  guessSpawns() {
+    if (this._guess) return this._guess;
+    const g = this.g, own = g.spawns[this.pid], n = g.players.length;
+    const cx = g.W / 2, cy = g.H / 2, R = Math.hypot(own.x - cx, own.y - cy), a0 = Math.atan2(own.y - cy, own.x - cx);
+    this._guess = [];
+    for (let i = 1; i < n; i++) this._guess.push({ x: cx + Math.cos(a0 + (i * 2 * Math.PI) / n) * R, y: cy + Math.sin(a0 + (i * 2 * Math.PI) / n) * R });
+    return this._guess;
+  }
+
+  // Ein Späher erkundet zu Beginn die Umgebung und die vermuteten Gegnerbasen
+  scout(army) {
+    const g = this.g, s = this.s;
+    if (!g.fogOf(this.pid) || s.scoutDone) return;
+    let u = s.scoutId ? g.ents.get(s.scoutId) : null;
+    if (!u) {
+      if (s.scoutId) { s.scoutId = 0; s.scoutRetry = g.time + 60; return; }
+      if (g.time < (s.scoutRetry || 0)) return;
+      u = army.find(a => a.type === 'rider') || army.find(a => a.type !== 'ram');
+      if (!u) return;
+      s.scoutId = u.id;
+      u.passive = true;
+      const i = army.indexOf(u); if (i >= 0) army.splice(i, 1);
+    }
+    u.passive = true;
+    if (u.order && u.order.t !== 'move') u.order = null;
+    if (u.order) return;
+    const h = this.home, pts = [];
+    for (let k = 0; k < 8; k++) { const a = (k / 8) * Math.PI * 2; pts.push({ x: h.x + Math.cos(a) * 13, y: h.y + Math.sin(a) * 13 }); }
+    pts.push({ x: g.W / 2, y: g.H / 2 });
+    for (const sp of this.guessSpawns()) pts.push(sp);
+    pts.push({ x: h.x, y: h.y });
+    s.wp = s.wp || 0;
+    if (s.wp >= pts.length) { s.scoutDone = true; u.passive = false; return; }
+    const p = pts[s.wp++];
+    g.issueMove([u.id], Math.max(2, Math.min(g.W - 3, p.x)), Math.max(2, Math.min(g.H - 3, p.y)));
   }
 
   // ---------- Wirtschaft ----------
@@ -352,6 +394,7 @@ export class AI {
     for (const e of g.units) {
       if (e.dead || e.owner === this.pid) continue;
       if (Math.abs(e.x - h.x) > 20 || Math.abs(e.y - h.y) > 20) continue;
+      if (!g.seesTile(this.pid, Math.floor(e.x), Math.floor(e.y))) continue;
       if (Math.hypot(e.x - h.x, e.y - h.y) < 18) threats.push(e);
     }
     s.threatNow = threats.length > 0;
@@ -403,8 +446,8 @@ export class AI {
     for (const p of g.players) {
       if (p.id === this.pid || p.defeated) continue;
       if (p.id === 0 && humanBusy && !c.gangUp) continue;
-      const sp = g.spawns[p.id];
-      const d = Math.hypot(sp.x - this.home.x, sp.y - this.home.y);
+      let d = 60;
+      for (const b of g.blds) if (b.owner === p.id && !b.dead && g.knowsBuilding(this.pid, b)) d = Math.min(d, Math.hypot(b.x - this.home.x, b.y - this.home.y));
       opts.push({ id: p.id, w: 1 / (d + 10) });
     }
     if (!opts.length) return -1;
@@ -422,13 +465,26 @@ export class AI {
     for (const b of g.blds) {
       if (b.dead || b.owner === this.pid || g.players[b.owner].defeated) continue;
       if (tp >= 0 && b.owner !== tp) continue;
+      if (!g.knowsBuilding(this.pid, b)) continue;
       let d = Math.hypot(b.x - o.x, b.y - o.y);
       if (b.type === 'farm') d += 6;
       if (d < bd) { bd = d; best = b; }
     }
     if (best) return { x: best.x, y: best.y + best.h / 2 + 0.5 };
     if (tp >= 0) return this.attackTarget(from, -1);
-    for (const u of g.units) if (!u.dead && u.owner !== this.pid) return { x: u.x, y: u.y };
+    if (!g.fogOf(this.pid)) { for (const u of g.units) if (!u.dead && u.owner !== this.pid) return { x: u.x, y: u.y }; return null; }
+    // Nichts bekannt: zur nächsten noch nicht gesehenen vermuteten Basis, sonst unerkundete Gebiete
+    let gs = null, gd = 1e9;
+    for (const sp of this.guessSpawns()) {
+      if (g.seesTile(this.pid, Math.floor(sp.x), Math.floor(sp.y))) continue;
+      const d = Math.hypot(sp.x - o.x, sp.y - o.y);
+      if (d < gd) { gd = d; gs = sp; }
+    }
+    if (gs) return gs;
+    for (let k = 0; k < 60; k++) {
+      const x = 3 + Math.floor(Math.random() * (g.W - 6)), y = 3 + Math.floor(Math.random() * (g.H - 6));
+      if (!g.explored(this.pid, x, y) && g.passable(x, y)) return { x: x + 0.5, y: y + 0.5 };
+    }
     return null;
   }
 }

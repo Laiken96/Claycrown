@@ -12,7 +12,8 @@ Optimiert für iPhone und iPad (Safari, Home-Bildschirm im Vollbild), läuft ebe
 * 7 Einheiten mit Stärken und Schwächen: Arbeiter, Speerträger, Schwertkämpfer, Bogenschütze, Reiter, Rammbock, Tonkoloss
 * 11 Technologien inklusive Zeitalteraufstieg
 * 1 bis 3 KI Gegner in drei Schwierigkeitsstufen, zufällige Karten in drei Größen
-* Nebel des Krieges, Minikarte, Sammelpunkte, Angriffsbewegung
+* Nebel des Krieges für alle Seiten: Die KI muss erkunden und sieht nur auf Schwer die ganze Karte
+* Minikarte, Sammelpunkte, Angriffsbewegung
 * Sieg durch Eroberung oder durch das Kronenmonument (3 Minuten halten)
 * Automatisches Speichern, offline spielbar als PWA
 

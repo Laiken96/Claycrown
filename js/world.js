@@ -67,9 +67,34 @@ export class Game {
         pop: 0, popCap: 0, defeated: false, stats: { gathered: 0, trained: 0, killed: 0, lost: 0, built: 0 },
       });
     }
+    this.initAiFog();
     this.generateMap(new RNG(this.seed));
     this.recalcPop();
     this.updateFog();
+  }
+
+  // Eigene Erkundungskarte je KI. Auf Schwer sieht die KI alles.
+  initAiFog(data) {
+    this.aiFog = {};
+    if (this.difficulty === 'hard') return;
+    const N = this.W * this.H;
+    for (const p of this.players) {
+      if (!p.isAI) continue;
+      const src = data && data[p.id];
+      this.aiFog[p.id] = src ? Uint8Array.from(src) : new Uint8Array(N).fill(data ? 1 : 0);
+    }
+  }
+  fogOf(pid) {
+    if (pid === 0) return this.revealAll ? null : this.vis;
+    return (this.aiFog && this.aiFog[pid]) || null;
+  }
+  explored(pid, tx, ty) { const f = this.fogOf(pid); return !f || f[ty * this.W + tx] > 0; }
+  seesTile(pid, tx, ty) { const f = this.fogOf(pid); return !f || f[ty * this.W + tx] === 2; }
+  knowsBuilding(pid, b) {
+    if (b.owner === pid) return true;
+    if (pid === 0) return b.seen;
+    if (!this.fogOf(pid)) return true;
+    return !!((b.seenM || 0) & (1 << pid));
   }
 
   // ---------- Speichern und Laden ----------
@@ -77,6 +102,7 @@ export class Game {
     return {
       v: 1, W: this.W, H: this.H, seed: this.seed, difficulty: this.difficulty, time: this.time, nextId: this.nextId,
       over: this.over, winner: this.winner, revealAll: this.revealAll, spawns: this.spawns,
+      aiFog: Object.fromEntries(Object.entries(this.aiFog || {}).map(([k, v]) => [k, Array.from(v)])),
       terrain: Array.from(this.terrain), vis: Array.from(this.vis), players: this.players,
       ents: Array.from(this.ents.values()), projectiles: this.projectiles, decals: this.decals,
     };
@@ -89,6 +115,7 @@ export class Game {
     this.projectiles = d.projectiles || []; this.decals = d.decals || [];
     this._alloc();
     this.players = d.players;
+    this.initAiFog(d.aiFog || {});
     for (let i = 0; i < this.terrain.length; i++) this.blk[i] = this.terrain[i] === T.WATER ? 1 : 0;
     for (const e of d.ents) { this.ents.set(e.id, e); if (e.cls !== 'u') this.occupy(e, true); }
     this.recalcPop();
@@ -324,7 +351,7 @@ export class Game {
     const d = BUILDINGS[type];
     for (let y = ty; y < ty + d.h; y++) for (let x = tx; x < tx + d.w; x++) {
       if (!this.buildableTile(x, y)) return false;
-      if (owner === 0 && !this.revealAll && this.vis[y * this.W + x] === 0) return false;
+      if (!this.explored(owner, x, y)) return false;
     }
     return true;
   }
@@ -742,7 +769,7 @@ export class Game {
     if (t.cls === 'u' && t.hp > 0 && attId) {
       const td = UNITS[t.type];
       const a = this.ents.get(attId);
-      if (a && td.cls !== 'worker' && (!t.order || t.order.t === 'amove') && this.canAttack(t, a)) {
+      if (a && td.cls !== 'worker' && !t.passive && (!t.order || t.order.t === 'amove') && this.canAttack(t, a)) {
         t.order = { t: 'attack', id: attId, auto: true, ox: t.x, oy: t.y, back: t.order };
       }
     }
@@ -826,6 +853,7 @@ export class Game {
 
   findNearestRes(kind, x, y, maxR, owner, uid) {
     const cx = Math.floor(x), cy = Math.floor(y);
+    const fog = owner >= 0 ? this.fogOf(owner) : null;
     let best = null, bd = 1e9;
     for (let r = 0; r <= maxR; r++) {
       for (let ty = cy - r; ty <= cy + r; ty++) {
@@ -835,6 +863,7 @@ export class Game {
           if (tx < 0 || tx >= this.W) continue;
           const id = this.occ[ty * this.W + tx];
           if (!id) continue;
+          if (fog && !fog[ty * this.W + tx]) continue;
           const e = this.ents.get(id);
           if (!e) continue;
           let ok = false;
@@ -935,7 +964,7 @@ export class Game {
   }
 
   idle(u, d, dt) {
-    if (d.cls === 'worker') return;
+    if (d.cls === 'worker' || u.passive) return;
     u.scanT -= dt;
     if (u.scanT > 0) return;
     u.scanT = 0.5 + Math.random() * 0.2;
@@ -1171,29 +1200,38 @@ export class Game {
     }
   }
 
-  updateFog() {
-    const vis = this.vis, W = this.W;
-    if (this.revealAll) { vis.fill(2); }
-    else {
-      for (let i = 0; i < vis.length; i++) if (vis[i] === 2) vis[i] = 1;
-      for (const e of this.ents.values()) {
-        if (e.owner !== 0) continue;
-        let r;
-        if (e.cls === 'u') r = UNITS[e.type].sight;
-        else if (e.cls === 'b') r = e.done ? BUILDINGS[e.type].sight || 4 : 2;
-        else continue;
-        r += e.cls === 'b' ? Math.max(e.w, e.h) / 2 : 0;
-        const offs = circleOffsets(Math.round(r));
-        const cx = Math.floor(e.x), cy = Math.floor(e.y);
-        for (let k = 0; k < offs.length; k += 2) {
-          const x = cx + offs[k], y = cy + offs[k + 1];
-          if (x >= 0 && y >= 0 && x < W && y < this.H) vis[y * W + x] = 2;
-        }
+  stampFog(pid, vis) {
+    const W = this.W;
+    for (let i = 0; i < vis.length; i++) if (vis[i] === 2) vis[i] = 1;
+    for (const e of this.ents.values()) {
+      if (e.owner !== pid) continue;
+      let r;
+      if (e.cls === 'u') r = UNITS[e.type].sight;
+      else if (e.cls === 'b') r = e.done ? BUILDINGS[e.type].sight || 4 : 2;
+      else continue;
+      r += e.cls === 'b' ? Math.max(e.w, e.h) / 2 : 0;
+      const offs = circleOffsets(Math.round(r));
+      const cx = Math.floor(e.x), cy = Math.floor(e.y);
+      for (let k = 0; k < offs.length; k += 2) {
+        const x = cx + offs[k], y = cy + offs[k + 1];
+        if (x >= 0 && y >= 0 && x < W && y < this.H) vis[y * W + x] = 2;
       }
     }
+  }
+
+  updateFog() {
+    const vis = this.vis, W = this.W;
+    if (this.revealAll) vis.fill(2);
+    else this.stampFog(0, vis);
+    const fogs = Object.entries(this.aiFog || {}).filter(([pid]) => !this.players[pid].defeated);
+    for (const [pid, f] of fogs) this.stampFog(Number(pid), f);
+    const sees = (f, e) => f[e.ty * W + e.tx] === 2 || f[(e.ty + e.h - 1) * W + e.tx + e.w - 1] === 2 || f[Math.floor(e.y) * W + Math.floor(e.x)] === 2;
     for (const e of this.ents.values()) {
-      if (e.cls === 'b' && e.owner !== 0 && !e.seen) {
-        if (vis[e.ty * W + e.tx] === 2 || vis[(e.ty + e.h - 1) * W + e.tx + e.w - 1] === 2 || vis[Math.floor(e.y) * W + Math.floor(e.x)] === 2) e.seen = true;
+      if (e.cls !== 'b') continue;
+      if (e.owner !== 0 && !e.seen && sees(vis, e)) e.seen = true;
+      for (const [pid, f] of fogs) {
+        const bit = 1 << Number(pid);
+        if (Number(pid) !== e.owner && !((e.seenM || 0) & bit) && sees(f, e)) e.seenM = (e.seenM || 0) | bit;
       }
     }
   }

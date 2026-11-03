@@ -44,10 +44,12 @@ button { font: inherit; color: inherit; touch-action: manipulation; cursor: poin
 #age-label { color: var(--gold); font-weight: 700; padding: 0 6px; white-space: nowrap; }
 .spacer { flex: 1; }
 #clock { font-variant-numeric: tabular-nums; color: var(--muted); }
-.tb { background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; height: 28px; min-width: 38px; font-size: 16px; }
+.tb { background: var(--panel2); border: 1px solid var(--gold); border-radius: 10px; height: 32px; min-width: 58px; font-size: 20px; position: relative; padding: 0 10px; margin-left: 4px; }
+.tb::after { content: ''; position: absolute; inset: -10px -12px -9px -12px; }
+.tb:active { transform: scale(0.94); background: #5a3a22; }
 
 /* Schnelltasten */
-#quick { position: absolute; top: calc(42px + var(--sat)); right: calc(8px + var(--sar)); display: flex; flex-direction: column; gap: 6px; z-index: 5; }
+#quick { position: absolute; top: calc(54px + var(--sat)); right: calc(8px + var(--sar)); display: flex; flex-direction: column; gap: 6px; z-index: 5; }
 #quick button {
   width: 46px; height: 46px; border-radius: 12px; background: var(--panel); border: 1px solid var(--line); font-size: 22px; position: relative;
 }
@@ -170,7 +172,7 @@ h3 { margin: 12px 0 4px; color: var(--gold); font-size: 15px; }
   #minimap-wrap { height: 92px; }
   #selinfo { flex: 1 1 0; max-width: none; height: 92px; }
   #cmds { flex: 1 1 100%; grid-template-columns: repeat(auto-fill, var(--btn)); justify-content: center; }
-  #topbar { font-size: 12px; gap: 3px; height: calc(30px + var(--sat)); flex-wrap: nowrap; }
+  #topbar { font-size: 12px; gap: 3px; height: calc(36px + var(--sat)); flex-wrap: nowrap; }
   .res { min-width: 0; padding: 1px 4px; }
   .res i { font-size: 12px; }
   #age-label { display: none; }
