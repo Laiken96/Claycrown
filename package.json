@@ -1,0 +1,11 @@
+{
+  "name": "claycrown",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Claycrown: Echtzeit Strategiespiel als Webapp",
+  "scripts": {
+    "start": "npx --yes http-server -p 8080 -c-1 .",
+    "simtest": "node tools/simtest.js"
+  }
+}
