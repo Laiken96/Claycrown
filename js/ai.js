@@ -3,9 +3,9 @@ import { UNITS, BUILDINGS, TECHS, MAX_POP } from './data.js';
 import { RES_KIND } from './world.js';
 
 const DIFF = {
-  easy: { workers: 16, firstAttack: 660, wave: 5, think: 1.6, towers: 0, monument: false, ageWorkers: [14, 18, 22], milStart: 14 },
-  normal: { workers: 30, firstAttack: 450, wave: 7, think: 1.0, towers: 1, monument: false, ageWorkers: [13, 20, 24], milStart: 11 },
-  hard: { workers: 40, firstAttack: 320, wave: 9, think: 0.6, towers: 2, monument: true, ageWorkers: [12, 20, 26], milStart: 10 },
+  easy: { workers: 16, firstAttack: 900, wave: 4, waveGrow: 1, armyRatio: 0.5, think: 1.6, towers: 0, monument: false, ageWorkers: [14, 18, 22], milStart: 16, gangUp: false },
+  normal: { workers: 28, firstAttack: 660, wave: 6, waveGrow: 1, armyRatio: 0.8, think: 1.0, towers: 1, monument: false, ageWorkers: [13, 20, 24], milStart: 14, gangUp: false },
+  hard: { workers: 40, firstAttack: 360, wave: 9, waveGrow: 2, armyRatio: 1.5, think: 0.6, towers: 2, monument: true, ageWorkers: [12, 20, 26], milStart: 10, gangUp: true },
 };
 
 const RATIOS = [
@@ -40,6 +40,7 @@ export class AI {
       else if (e.cls === 'b') { blds.push(e); (by[e.type] ||= []).push(e); }
     }
     this.by = by;
+    this.armySize = army.length; this.workers = workers.length;
     const keep = (by.keep || []).find(b => b.done) || (by.keep || [])[0];
     const anchor = keep || blds[0] || workers[0] || army[0];
     if (!anchor) return;
@@ -323,6 +324,7 @@ export class AI {
         if (!trains.includes(pick)) pick = trains[0];
       } else pick = trains[Math.floor(Math.random() * trains.length)];
       if (pick === 'ram' && rams >= 3) continue;
+      if (!this.s.threatNow && this.armySize >= Math.max(6, this.workers * this.cfg.armyRatio)) return;
       if (p.pop >= p.popCap) return;
       const cost = UNITS[pick].cost;
       if (this.affordR(cost) || (this.s.threatNow && g.canAfford(p, cost))) g.train(b.id, pick);
@@ -369,41 +371,63 @@ export class AI {
 
   manageAttack(army) {
     const g = this.g, s = this.s, c = this.cfg;
-    const wave = Math.min(30, c.wave + s.waves * 2);
+    const wave = Math.min(30, c.wave + s.waves * c.waveGrow);
     if (!s.attacking) {
-      if (g.time >= c.firstAttack && army.length >= wave && !s.threatNow) {
-        s.attacking = true; s.waveStart = army.length;
-        const t = this.attackTarget();
+      if (g.time >= c.firstAttack && army.length >= wave && !s.threatNow && g.time >= (s.nextAttack || 0)) {
+        const tp = this.pickTargetPlayer();
+        if (tp < 0) { s.nextAttack = g.time + 30; return; }
+        s.attacking = true; s.waveStart = army.length; s.targetPlayer = tp;
+        const t = this.attackTarget(null, tp);
         if (t) g.issueMove(army.map(u => u.id), t.x, t.y, true);
       }
       return;
     }
     if (army.length < Math.max(2, s.waveStart * 0.3)) {
-      s.attacking = false; s.waves++;
+      s.attacking = false; s.waves++; s.nextAttack = g.time + (c.gangUp ? 30 : 90);
       g.issueMove(army.map(u => u.id), this.home.x + 3, this.home.y + 3, false);
       return;
     }
     const idle = army.filter(u => !u.order);
     if (idle.length) {
-      const t = this.attackTarget(idle[0]);
+      const t = this.attackTarget(idle[0], s.targetPlayer);
       if (t) g.issueMove(idle.map(u => u.id), t.x, t.y, true);
-      else { s.attacking = false; s.waves++; }
+      else { s.attacking = false; s.waves++; s.nextAttack = g.time + 60; }
     }
   }
 
-  attackTarget(from) {
+  // Zielspieler wählen: auf Leicht und Normal greifen KIs dich nie gleichzeitig an
+  pickTargetPlayer() {
+    const g = this.g, c = this.cfg;
+    const humanBusy = g.players.some(p => p.id !== this.pid && p.isAI && !p.defeated && p.ai && p.ai.attacking && p.ai.targetPlayer === 0);
+    const opts = [];
+    for (const p of g.players) {
+      if (p.id === this.pid || p.defeated) continue;
+      if (p.id === 0 && humanBusy && !c.gangUp) continue;
+      const sp = g.spawns[p.id];
+      const d = Math.hypot(sp.x - this.home.x, sp.y - this.home.y);
+      opts.push({ id: p.id, w: 1 / (d + 10) });
+    }
+    if (!opts.length) return -1;
+    let r = Math.random() * opts.reduce((n, o) => n + o.w, 0);
+    for (const o of opts) { r -= o.w; if (r <= 0) return o.id; }
+    return opts[opts.length - 1].id;
+  }
+
+  attackTarget(from, tp) {
     const g = this.g;
     const o = from || this.home;
-    // Ziel: nächstes feindliches Gebäude, menschlicher Spieler leicht bevorzugt
+    if (tp == null || !g.players[tp] || g.players[tp].defeated) tp = -1;
+    // Ziel: nächstes Gebäude des Zielspielers, sonst irgendein Gegner
     let best = null, bd = 1e9;
     for (const b of g.blds) {
       if (b.dead || b.owner === this.pid || g.players[b.owner].defeated) continue;
+      if (tp >= 0 && b.owner !== tp) continue;
       let d = Math.hypot(b.x - o.x, b.y - o.y);
-      if (b.owner === 0) d *= 0.8;
       if (b.type === 'farm') d += 6;
       if (d < bd) { bd = d; best = b; }
     }
     if (best) return { x: best.x, y: best.y + best.h / 2 + 0.5 };
+    if (tp >= 0) return this.attackTarget(from, -1);
     for (const u of g.units) if (!u.dead && u.owner !== this.pid) return { x: u.x, y: u.y };
     return null;
   }
