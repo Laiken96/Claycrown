@@ -186,3 +186,12 @@ h3 { margin: 12px 0 4px; color: var(--gold); font-size: 15px; }
   #quick { gap: 3px; top: calc(38px + var(--sat)); }
   #quick button { width: 36px; height: 36px; font-size: 17px; }
 }
+
+/* Endstatistik */
+.panel.end { width: min(620px, 100%); }
+#end-tabs { justify-content: center; margin: 6px auto; width: fit-content; }
+#end-chart { width: 100%; height: 160px; display: block; background: rgba(0,0,0,0.25); border-radius: 10px; margin-bottom: 8px; }
+.stats-wrap { overflow-x: auto; margin-bottom: 12px; }
+#end-stats { margin: 0 auto; }
+#end-stats td.lbl { text-align: left; color: var(--muted); white-space: nowrap; }
+#end-stats td { text-align: right; font-variant-numeric: tabular-nums; }

@@ -59,6 +59,11 @@ export const UNITS = {
     ma: 0, pa: 8, cls: 'siege', r: 0.6, siege: true, proj: true, stone: true, bonus: { bld: 95 }, cost: { wood: 200, gold: 200 }, time: 35, age: 2,
     desc: 'Schleudert Steine auf Gebäude aus großer Entfernung. Wehrlos gegen Einheiten.',
   },
+  priest: {
+    name: 'Priester', icon: '🙏', hp: 30, atk: 0, range: 0, rof: 1, speed: 1.7, sight: 7,
+    ma: 0, pa: 0, cls: 'priest', r: 0.28, heal: 2.5, healRange: 4, cost: { gold: 100 }, time: 25, age: 1,
+    desc: 'Heilt verletzte eigene Einheiten und Arbeiter in der Nähe. Kämpft nicht.',
+  },
   golem: {
     name: 'Tonkoloss', icon: '🗿', hp: 320, atk: 16, range: 0, rof: 2.2, speed: 1.5, sight: 6,
     ma: 3, pa: 4, cls: 'inf', r: 0.5, bonus: { bld: 10 }, cost: { food: 120, gold: 100, clay: 100 }, time: 28, age: 3,
@@ -110,6 +115,10 @@ export const BUILDINGS = {
     name: 'Schmiede', icon: '🔨', w: 3, h: 3, hp: 1000, cost: { wood: 150 }, time: 40, age: 1,
     techs: ['blades', 'arrows', 'armor'], sight: 4, cat: 'mil', desc: 'Erforscht Waffen und Rüstungen.',
   },
+  temple: {
+    name: 'Tempel', icon: '⛪', w: 3, h: 3, hp: 1200, cost: { wood: 175, clay: 75 }, time: 45, age: 1,
+    trains: ['priest'], techs: ['herbs'], sight: 5, cat: 'mil', desc: 'Bildet Priester aus, die verletzte Einheiten heilen.',
+  },
   tower: {
     name: 'Wachturm', icon: '🗼', w: 2, h: 2, hp: 1000, ma: 2, pa: 8, cost: { wood: 25, clay: 125 }, time: 45, age: 1,
     atk: 6, range: 7, rof: 2, sight: 9, cat: 'mil', desc: 'Beschießt Feinde in Reichweite.',
@@ -126,7 +135,7 @@ export const BUILDINGS = {
 };
 
 export const ECO_BUILD = ['house', 'farm', 'mill', 'lumber', 'mine', 'keep', 'monument'];
-export const MIL_BUILD = ['barracks', 'range', 'stable', 'forge', 'tower', 'workshop'];
+export const MIL_BUILD = ['barracks', 'range', 'stable', 'forge', 'temple', 'tower', 'workshop'];
 
 export const TECHS = {
   age1: { name: 'Brennofenzeit', icon: '🏺', cost: { food: 500 }, time: 45, age: 0, ageUp: 1, desc: 'Zweites Zeitalter: Bogenschützen, Reiter, Schmiede, Türme.' },
@@ -139,5 +148,6 @@ export const TECHS = {
   blades: { name: 'Gehärtete Klingen', icon: '🗡️', cost: { food: 150, gold: 60 }, time: 35, age: 1, desc: 'Nahkampfeinheiten plus 2 Angriff.' },
   arrows: { name: 'Befiederte Pfeile', icon: '🪶', cost: { food: 100, gold: 60 }, time: 35, age: 1, desc: 'Bogenschützen, Türme und Burgen plus 1 Angriff und plus 1 Reichweite.' },
   armor: { name: 'Gebrannte Rüstung', icon: '🥋', cost: { food: 150, clay: 80 }, time: 35, age: 1, desc: 'Militär plus 1 Nahkampf und plus 1 Fernkampfrüstung.' },
+  herbs: { name: 'Heilkräuter', icon: '🌿', cost: { food: 100, gold: 120 }, time: 30, age: 1, desc: 'Priester heilen 50 % schneller und mit plus 2 Reichweite.' },
   masonry: { name: 'Ziegelbau', icon: '🧱', cost: { wood: 150, clay: 150 }, time: 40, age: 2, desc: 'Alle Gebäude plus 30 % Trefferpunkte.' },
 };

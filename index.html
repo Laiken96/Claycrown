@@ -90,10 +90,12 @@
 </div>
 
 <div id="end" class="screen hidden">
-  <div class="panel small">
+  <div class="panel small end">
     <h2 id="end-title">Sieg</h2>
     <p id="end-text"></p>
-    <table id="end-stats"></table>
+    <div class="seg" id="end-tabs"><button class="on">Bevölkerung</button><button>Armeewert</button><button>Gesammelt</button></div>
+    <canvas id="end-chart"></canvas>
+    <div class="stats-wrap"><table id="end-stats"></table></div>
     <div class="actions"><button id="btn-end-menu" class="big primary">Hauptmenü</button></div>
   </div>
 </div>
@@ -103,7 +105,7 @@
     <h2>Anleitung</h2>
     <div class="helptext">
       <h3>Ziel</h3>
-      <p>Vernichte alle Gebäude und Einheiten deiner Gegner. Alternativ errichtest du in der Kronenzeit das Kronenmonument und hältst es 3 Minuten lang.</p>
+      <p>Zerstöre die Burgen und Militärgebäude deiner Gegner. Wer 30 Sekunden lang weder Burg noch Militärgebäude besitzt, ist besiegt. Häuser, Lager und Felder zählen nicht. Alternativ errichtest du in der Kronenzeit das Kronenmonument und hältst es 3 Minuten lang.</p>
       <h3>Steuerung am Touchscreen</h3>
       <ul>
         <li><b>Tippen</b> auf eigene Einheit oder Gebäude wählt es aus.</li>
@@ -135,6 +137,8 @@
         <li>🔱 Speerträger schlagen Reiter. 🐎 Reiter schlagen Bogenschützen. 🏹 Bogenschützen schlagen Infanterie.</li>
         <li>🐏 Rammböcke und ☄️ Triboks zerstören Gebäude. Der Tribok schießt aus großer Entfernung, ist aber wehrlos gegen Einheiten.</li>
         <li>🗿 Tonkolosse sind die Elite der Kronenzeit.</li>
+        <li>🙏 Priester aus dem ⛪ Tempel heilen verletzte Einheiten und Arbeiter in der Nähe automatisch.</li>
+        <li>Militär marschiert in Formation: Nahkampf vorn, Fernkampf dahinter, Priester und Belagerung hinten. Die Gruppe läuft im Tempo der langsamsten Einheit.</li>
       </ul>
     </div>
     <div class="actions"><button id="btn-help-close" class="big primary">Verstanden</button></div>

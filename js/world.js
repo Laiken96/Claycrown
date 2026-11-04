@@ -8,6 +8,7 @@ export const T = { GRASS: 0, WATER: 1, SHALLOW: 2, SAND: 3, DIRT: 4 };
 export const RES_KIND = { tree: 'wood', gold: 'gold', clay: 'clay', berry: 'food' };
 const RES_AMOUNT = { tree: 100, gold: 800, clay: 800, berry: 125 };
 const BASE_RATE = { tree: 0.48, gold: 0.40, clay: 0.44, berry: 0.50, farm: 0.44 };
+const CORE = new Set(['keep', 'barracks', 'range', 'stable', 'forge', 'temple', 'tower', 'workshop', 'monument']);
 const DX = [1, -1, 0, 0, 1, 1, -1, -1];
 const DY = [0, 0, 1, -1, 1, -1, 1, -1];
 const CELL = 4;
@@ -64,10 +65,11 @@ export class Game {
       this.players.push({
         id: i, name: PLAYER_NAMES[i], color: PLAYER_COLORS[i], isAI: i > 0, ai: i > 0 ? {} : null,
         res: { food: 200, wood: 200, gold: 100, clay: 100 }, age: 0, techs: {}, researching: {},
-        pop: 0, popCap: 0, defeated: false, stats: { gathered: 0, trained: 0, killed: 0, lost: 0, built: 0 },
+        pop: 0, popCap: 0, defeated: false, stats: { gathered: 0, trained: 0, killed: 0, lost: 0, built: 0, bKilled: 0, bLost: 0, techs: 0, healed: 0, peakPop: 0, ageT: [0], res: { food: 0, wood: 0, gold: 0, clay: 0 } },
       });
     }
     this.initAiFog();
+    this.history = [];
     this.generateMap(new RNG(this.seed));
     this.recalcPop();
     this.updateFog();
@@ -101,7 +103,7 @@ export class Game {
   toJSON() {
     return {
       v: 1, W: this.W, H: this.H, seed: this.seed, difficulty: this.difficulty, time: this.time, nextId: this.nextId,
-      over: this.over, winner: this.winner, revealAll: this.revealAll, spawns: this.spawns,
+      over: this.over, winner: this.winner, revealAll: this.revealAll, spawns: this.spawns, history: this.history,
       aiFog: Object.fromEntries(Object.entries(this.aiFog || {}).map(([k, v]) => [k, Array.from(v)])),
       terrain: Array.from(this.terrain), vis: Array.from(this.vis), players: this.players,
       ents: Array.from(this.ents.values()), projectiles: this.projectiles, decals: this.decals,
@@ -115,6 +117,8 @@ export class Game {
     this.projectiles = d.projectiles || []; this.decals = d.decals || [];
     this._alloc();
     this.players = d.players;
+    this.history = d.history || [];
+    for (const p of this.players) p.stats = Object.assign({ bKilled: 0, bLost: 0, techs: 0, healed: 0, peakPop: 0, ageT: [0], res: { food: 0, wood: 0, gold: 0, clay: 0 } }, p.stats);
     this.initAiFog(d.aiFog || {});
     for (let i = 0; i < this.terrain.length; i++) this.blk[i] = this.terrain[i] === T.WATER ? 1 : 0;
     for (const e of d.ents) { this.ents.set(e.id, e); if (e.cls !== 'u') this.occupy(e, true); }
@@ -344,7 +348,10 @@ export class Game {
   carryCap(p) { return p.techs.wheelbarrow ? 15 : 10; }
   unitSpeed(u) {
     const d = UNITS[u.type];
-    return d.speed * (u.type === 'worker' && this.players[u.owner].techs.wheelbarrow ? 1.1 : 1);
+    let sp = d.speed * (u.type === 'worker' && this.players[u.owner].techs.wheelbarrow ? 1.1 : 1);
+    const o = u.order;
+    if (o && o.cap && (o.t === 'move' || o.t === 'amove')) sp = Math.min(sp, o.cap);
+    return sp;
   }
 
   // ---------- Befehle ----------
@@ -438,9 +445,52 @@ export class Game {
 
   issueStop(ids) { for (const u of this.unitsOf(ids)) { u.order = null; u.path = null; } }
 
+  // Militärformation: Nahkampf vorn, Fernkampf dahinter, Priester und Belagerung hinten
+  militaryFormation(us, x, y) {
+    let cx = 0, cy = 0;
+    for (const u of us) { cx += u.x; cy += u.y; }
+    cx /= us.length; cy /= us.length;
+    let dir = Math.atan2(y - cy, x - cx);
+    if (Math.hypot(x - cx, y - cy) < 1) dir = us[0].dir || 0;
+    const rank = { inf: 0, cav: 1, arch: 2, priest: 3, siege: 4 };
+    const sorted = us.slice().sort((a, b) => (rank[UNITS[a.type].cls] ?? 2) - (rank[UNITS[b.type].cls] ?? 2));
+    const cols = Math.max(3, Math.ceil(Math.sqrt(us.length * 1.8)));
+    const fx = Math.cos(dir), fy = Math.sin(dir), px = -fy, py = fx;
+    const out = new Map();
+    let row = 0, depth = 0;
+    for (let i = 0; i < sorted.length; i += cols, row++) {
+      const line = sorted.slice(i, i + cols);
+      const sp = Math.max(...line.map(u => UNITS[u.type].r)) * 2 + 0.35;
+      if (row > 0) depth += sp;
+      line.forEach((u, k) => {
+        const lat = (k - (line.length - 1) / 2) * sp;
+        let tx = x - fx * depth + px * lat, ty = y - fy * depth + py * lat;
+        tx = clamp(tx, 0.5, this.W - 0.5); ty = clamp(ty, 0.5, this.H - 0.5);
+        if (!this.passableAt(tx, ty)) {
+          const np = this.nearestPassable(Math.floor(tx), Math.floor(ty), 6);
+          if (np) { tx = np.x + 0.5; ty = np.y + 0.5; }
+        }
+        out.set(u.id, { x: tx, y: ty });
+      });
+    }
+    return { spots: out, dir };
+  }
+
   issueMove(ids, x, y, amove) {
-    const us = this.unitsOf(ids);
+    let us = this.unitsOf(ids);
     if (!us.length) return;
+    const mil = us.filter(u => u.type !== 'worker');
+    if (mil.length >= 2) {
+      const { spots, dir } = this.militaryFormation(mil, x, y);
+      const cap = Math.min(...mil.map(u => UNITS[u.type].speed));
+      for (const u of mil) {
+        const s = spots.get(u.id);
+        u.order = { t: amove ? 'amove' : 'move', x: s.x, y: s.y, cap, face: dir };
+        u.path = null; u.stN = 0;
+      }
+      us = us.filter(u => u.type === 'worker');
+      if (!us.length) return;
+    }
     const spots = this.formation(x, y, us.length);
     const free = spots.slice();
     us.sort((a, b) => Math.hypot(a.x - x, a.y - y) - Math.hypot(b.x - x, b.y - y));
@@ -713,6 +763,7 @@ export class Game {
   canAttack(u, t) {
     if (!t || !this.isEnemy(u, t) || t.cls === 'r') return false;
     if (UNITS[u.type].siege && t.cls !== 'b') return false;
+    if (!UNITS[u.type].atk) return false;
     return true;
   }
 
@@ -793,6 +844,7 @@ export class Game {
     } else if (e.cls === 'b') {
       for (const q of e.queue) if (q.k === 't') delete p.researching[q.key];
       this.decals.push({ k: 'rubble', x: e.tx, y: e.ty, w: e.w, h: e.h, t: 0 });
+      if (e.done || e.prog > 0.2) { p.stats.bLost++; if (by >= 0 && this.players[by]) this.players[by].stats.bKilled++; }
       this.emit({ type: 'destroyed', x: e.x, y: e.y, owner: e.owner, btype: e.type });
       this.recalcPop();
     }
@@ -932,13 +984,18 @@ export class Game {
     if (u.cool > 0) u.cool -= dt;
     if (u.repT > 0) u.repT -= dt;
     if (u.atkT > 0) u.atkT -= dt;
+    if (u.healT > 0) u.healT -= dt;
     u.moving = false; u.work = 0;
     const o = u.order;
     if (!o) this.idle(u, d, dt);
-    else if (o.t === 'move') { if (this.goTo(u, o.x, o.y, 0.12)) u.order = null; }
+    else if (o.t === 'move') { if (this.goTo(u, o.x, o.y, 0.12)) { if (o.face != null) u.dir = o.face; u.order = null; } }
     else if (o.t === 'amove') {
       u.scanT -= dt;
-      if (u.scanT <= 0) {
+      if (u.scanT <= 0 && d.heal) {
+        u.scanT = 0.5;
+        const w = this.findWounded(u, d.sight);
+        if (w) { u.order = { t: 'heal', id: w.id, auto: true, ox: u.x, oy: u.y }; return; }
+      } else if (u.scanT <= 0) {
         u.scanT = 0.4;
         const t = this.findTarget(u, d.sight);
         if (t) { u.order = { t: 'attack', id: t.id, back: o }; u.path = null; return; }
@@ -947,6 +1004,7 @@ export class Game {
     } else if (o.t === 'attack') this.doAttack(u, o, d, dt);
     else if (o.t === 'gather') this.doGather(u, o, dt);
     else if (o.t === 'build') this.doBuild(u, o, dt);
+    else if (o.t === 'heal') this.doHeal(u, o, d, dt);
     // Steckenbleiben erkennen
     if (u.moving) {
       u.stT += dt;
@@ -967,6 +1025,14 @@ export class Game {
 
   idle(u, d, dt) {
     if (d.cls === 'worker' || u.passive) return;
+    if (d.heal) {
+      u.scanT -= dt;
+      if (u.scanT > 0) return;
+      u.scanT = 0.5;
+      const w = this.findWounded(u, d.sight);
+      if (w) u.order = { t: 'heal', id: w.id, auto: true, ox: u.x, oy: u.y };
+      return;
+    }
     u.scanT -= dt;
     if (u.scanT > 0) return;
     u.scanT = 0.5 + Math.random() * 0.2;
@@ -997,6 +1063,31 @@ export class Game {
     } else this.approach(u, t, r);
   }
 
+  doHeal(u, o, d, dt) {
+    const t = this.ents.get(o.id);
+    if (!t || t.dead || t.owner !== u.owner || t.cls !== 'u' || t.hp >= t.maxHp) { u.order = null; u.path = null; return; }
+    if (o.auto && Math.hypot(u.x - o.ox, u.y - o.oy) > 12) { u.order = { t: 'move', x: o.ox, y: o.oy }; u.path = null; return; }
+    const p = this.players[u.owner];
+    const range = d.healRange + (p.techs.herbs ? 2 : 0);
+    if (this.edgeDist(u, t) <= range) {
+      u.path = null; u.work = 1; u.healT = 0.3; u.healId = t.id;
+      u.dir = Math.atan2(t.y - u.y, t.x - u.x);
+      const amt = Math.min(t.maxHp - t.hp, d.heal * (p.techs.herbs ? 1.5 : 1) * dt);
+      t.hp += amt; t.healT = 0.4;
+      p.stats.healed = (p.stats.healed || 0) + amt;
+    } else this.approach(u, t, range);
+  }
+
+  findWounded(u, r) {
+    let best = null, bd = 1e9;
+    this.near(u.x, u.y, r, v => {
+      if (v.owner !== u.owner || v.dead || v.id === u.id || v.hp >= v.maxHp || UNITS[v.type].siege) return;
+      const d = Math.hypot(v.x - u.x, v.y - u.y) - (1 - v.hp / v.maxHp) * 3;
+      if (d < bd) { bd = d; best = v; }
+    });
+    return best;
+  }
+
   doGather(u, o, dt) {
     const p = this.players[u.owner];
     const cap = this.carryCap(p);
@@ -1014,7 +1105,7 @@ export class Game {
       if (!drop) { if (!valid || u.carryN >= cap - 1e-6) { o.dropping = false; if (!valid) u.order = null; } return; }
       if (this.approach(u, drop, 0.3)) {
         const n = Math.floor(u.carryN + 1e-6);
-        if (u.carry) { p.res[u.carry] += n; p.stats.gathered += n; }
+        if (u.carry) { p.res[u.carry] += n; p.stats.gathered += n; if (p.stats.res) p.stats.res[u.carry] += n; }
         u.carryN = 0; o.dropping = false; u.path = null;
         if (!valid) u.order = null;
       }
@@ -1180,7 +1271,8 @@ export class Game {
     p.techs[key] = true;
     delete p.researching[key];
     const t = TECHS[key];
-    if (t.ageUp) { p.age = t.ageUp; this.emit({ type: 'age', owner: p.id, age: p.age }); }
+    p.stats.techs = (p.stats.techs || 0) + 1;
+    if (t.ageUp) { p.age = t.ageUp; if (p.stats.ageT) p.stats.ageT[t.ageUp] = Math.round(this.time); this.emit({ type: 'age', owner: p.id, age: p.age }); }
     else this.emit({ type: 'tech', owner: p.id, key });
     if (key === 'masonry') {
       for (const b of this.ents.values()) if (b.cls === 'b' && b.owner === p.id) {
@@ -1248,13 +1340,31 @@ export class Game {
 
   checkVictory() {
     if (this.over) return;
-    const alive = this.players.map(() => false);
+    // Wer keine Burg und kein Militärgebäude mehr hat, ist nach einer Frist von 30 Sekunden besiegt.
+    // Häuser, Lager und Felder halten ein Reich nicht am Leben, eine Burgbaustelle schon.
+    const hasB = this.players.map(() => false), hasU = this.players.map(() => false);
     for (const e of this.ents.values()) {
-      if (e.cls === 'u' || (e.cls === 'b' && e.type !== 'farm')) alive[e.owner] = true;
+      if (e.cls === 'b' && ((e.done && CORE.has(e.type)) || e.type === 'keep')) hasB[e.owner] = true;
+      else if (e.cls === 'u') hasU[e.owner] = true;
     }
     this.players.forEach((p, i) => {
-      if (!p.defeated && !alive[i]) { p.defeated = true; this.emit({ type: 'defeated', owner: i }); }
+      if (p.defeated) return;
+      p.stats.peakPop = Math.max(p.stats.peakPop || 0, p.pop);
+      if (hasB[i]) { p.noBldT = 0; return; }
+      p.noBldT = (p.noBldT || 0) + 1;
+      if (i === 0 && hasU[i] && p.noBldT === 1) this.emit({ type: 'info', text: '⚠ Keine Burg und kein Militärgebäude mehr! Baue in 30 Sekunden eine Burg, sonst ist das Spiel verloren.' });
+      if (!hasU[i] || p.noBldT >= 30) {
+        p.defeated = true;
+        for (const e of [...this.ents.values()]) if (e.owner === i && e.cls !== 'r') this.kill(e, -1);
+        this.emit({ type: 'defeated', owner: i });
+      }
     });
+    // Verlauf für die Endstatistik alle 30 Sekunden
+    if (!this.history.length || this.time - this.history[this.history.length - 1].t >= 30) {
+      const armyVal = this.players.map(() => 0);
+      for (const e of this.ents.values()) if (e.cls === 'u' && e.type !== 'worker') { const c = UNITS[e.type].cost; armyVal[e.owner] += Object.values(c).reduce((a, b) => a + b, 0); }
+      this.history.push({ t: Math.round(this.time), p: this.players.map((p, i) => [p.pop, armyVal[i], p.stats.gathered]) });
+    }
     if (this.players[0].defeated) { this.over = true; this.winner = -1; this.emit({ type: 'gameover', winner: -1 }); }
     else if (this.players.slice(1).every(p => p.defeated)) { this.over = true; this.winner = 0; this.emit({ type: 'gameover', winner: 0 }); }
   }

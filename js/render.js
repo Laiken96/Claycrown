@@ -613,7 +613,27 @@ export class Renderer {
         c.fillStyle = '#5a7a3a'; c.beginPath(); c.moveTo(-0.13, -0.6); c.lineTo(0.13, -0.6); c.lineTo(0, -0.78); c.fill();
       }
     }
+    if (u.type === 'priest') {
+      // Robe, Stola in Spielerfarbe und Stab mit leuchtender Kugel
+      c.fillStyle = '#efe6d2'; c.beginPath(); c.moveTo(-0.17, 0.02); c.lineTo(0.17, 0.02); c.lineTo(0.12, -0.4); c.lineTo(-0.12, -0.4); c.closePath(); c.fill();
+      c.fillStyle = col; c.fillRect(-0.04, -0.4, 0.08, 0.4);
+      c.fillStyle = '#f0c8a0'; c.beginPath(); c.arc(face * 0.02, -0.5, 0.1, 0, 7); c.fill();
+      c.fillStyle = '#efe6d2'; c.beginPath(); c.arc(face * 0.02, -0.53, 0.105, Math.PI, 0); c.fill();
+      c.strokeStyle = '#8a6a3a'; c.lineWidth = 0.035;
+      c.beginPath(); c.moveTo(face * 0.2, 0.02); c.lineTo(face * 0.2, -0.72); c.stroke();
+      const glow = u.healT > 0 ? 0.6 + Math.sin(time * 12) * 0.3 : 0.35;
+      c.fillStyle = `rgba(140,255,160,${glow})`; c.beginPath(); c.arc(face * 0.2, -0.76, u.healT > 0 ? 0.11 : 0.07, 0, 7); c.fill();
+    }
     c.restore();
+    if (u.healT > 0 && u.type !== 'priest') {
+      // Heilfunken steigen auf
+      for (let k = 0; k < 3; k++) {
+        const ph = (time * 1.5 + k / 3 + u.id * 0.17) % 1;
+        const hx = sx + Math.sin(k * 2.1 + u.id) * s * 0.25, hy = sy - s * (0.3 + ph * 0.8);
+        c.fillStyle = `rgba(120,255,140,${1 - ph})`;
+        c.fillRect(hx - s * 0.06, hy - s * 0.015, s * 0.12, s * 0.03); c.fillRect(hx - s * 0.015, hy - s * 0.06, s * 0.03, s * 0.12);
+      }
+    }
   }
   body(c, x, y, r, col, face) {
     c.fillStyle = shade(col, -0.25); c.beginPath(); c.arc(x, y + 0.02, r, 0, 7); c.fill();

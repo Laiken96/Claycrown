@@ -301,13 +301,66 @@ export class UI {
   endScreen(win, reason) {
     const g = this.app.g;
     $('end-title').textContent = win ? '👑 Sieg' : '💀 Niederlage';
-    $('end-text').textContent = win
+    $('end-text').textContent = (win
       ? (reason === 'monument' ? 'Dein Kronenmonument hat die Zeit überdauert. Die Krone gehört dir.' : 'Alle Gegner sind besiegt. Die Krone gehört dir.')
-      : (reason === 'monument' ? 'Ein feindliches Monument hat die Zeit überdauert.' : 'Dein Reich ist gefallen.');
-    const rows = [['Reich', 'Zeitalter', 'Gesammelt', 'Ausgebildet', 'Getötet', 'Verloren']];
-    for (const p of g.players) rows.push([p.name, AGES[p.age].name, p.stats.gathered, p.stats.trained, p.stats.killed, p.stats.lost]);
-    $('end-stats').innerHTML = rows.map((r, i) => `<tr>${r.map(c => i ? `<td>${c}</td>` : `<th>${c}</th>`).join('')}</tr>`).join('') + `<tr><td colspan="6">Spielzeit ${fmtTime(g.time)}</td></tr>`;
+      : (reason === 'monument' ? 'Ein feindliches Monument hat die Zeit überdauert.' : 'Dein Reich ist gefallen.')) + ` Spielzeit ${fmtTime(g.time)}.`;
+    const ps = g.players, st = p => p.stats;
+    const ageAt = (p, a) => (st(p).ageT && st(p).ageT[a] ? fmtTime(st(p).ageT[a]) : 'nie');
+    const rows = [
+      ['Zeitalter', p => AGES[p.age].name],
+      ['Brennofenzeit', p => ageAt(p, 1)], ['Bronzezeit', p => ageAt(p, 2)], ['Kronenzeit', p => ageAt(p, 3)],
+      ['🌾 Nahrung', p => (st(p).res || {}).food || 0], ['🪵 Holz', p => (st(p).res || {}).wood || 0],
+      ['🪙 Gold', p => (st(p).res || {}).gold || 0], ['🧱 Lehm', p => (st(p).res || {}).clay || 0],
+      ['Gesammelt gesamt', p => st(p).gathered],
+      ['Höchste Bevölkerung', p => st(p).peakPop || 0],
+      ['Einheiten ausgebildet', p => st(p).trained], ['Gegner getötet', p => st(p).killed], ['Einheiten verloren', p => st(p).lost],
+      ['Gebäude errichtet', p => st(p).built], ['Gebäude zerstört', p => st(p).bKilled || 0], ['Gebäude verloren', p => st(p).bLost || 0],
+      ['Forschungen', p => st(p).techs || 0], ['Geheilt (Lebenspunkte)', p => Math.round(st(p).healed || 0)],
+    ];
+    const head = `<tr><th></th>${ps.map(p => `<th style="color:${p.color}">${p.name}</th>`).join('')}</tr>`;
+    $('end-stats').innerHTML = head + rows.map(([n, f]) => `<tr><td class="lbl">${n}</td>${ps.map(p => `<td>${f(p)}</td>`).join('')}</tr>`).join('');
+    this.endTab = this.endTab || 0;
+    const tabs = $('end-tabs');
+    tabs.querySelectorAll('button').forEach((b, i) => {
+      b.classList.toggle('on', i === this.endTab);
+      b.onclick = () => { this.endTab = i; tabs.querySelectorAll('button').forEach((x, j) => x.classList.toggle('on', j === i)); this.drawChart(); };
+    });
     $('end').classList.remove('hidden');
+    this.drawChart();
+  }
+
+  // Verlaufsgrafik: Bevölkerung, Armeewert oder gesammelte Rohstoffe über die Zeit
+  drawChart() {
+    const g = this.app.g, cv = $('end-chart'), h = g.history || [];
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const W = cv.clientWidth || 320, H = cv.clientHeight || 160;
+    cv.width = W * dpr; cv.height = H * dpr;
+    const c = cv.getContext('2d'); c.setTransform(dpr, 0, 0, dpr, 0, 0);
+    c.clearRect(0, 0, W, H);
+    const k = this.endTab || 0;
+    const army = g.players.map(() => 0);
+    for (const e of g.ents.values()) if (e.cls === 'u' && e.type !== 'worker') army[e.owner] += Object.values(UNITS[e.type].cost).reduce((x, y) => x + y, 0);
+    const pts = h.concat([{ t: Math.round(g.time), p: g.players.map((p, i) => [p.pop, army[i], p.stats.gathered]) }]);
+    let max = 1;
+    for (const s of pts) for (const v of s.p) max = Math.max(max, v[k]);
+    const T = Math.max(60, pts[pts.length - 1].t), L = 38, B = 18, R = 8, Tp = 8;
+    c.strokeStyle = 'rgba(255,255,255,0.12)'; c.fillStyle = 'rgba(246,234,214,0.6)'; c.font = '10px sans-serif'; c.lineWidth = 1;
+    for (let i = 0; i <= 4; i++) {
+      const y = Tp + (H - Tp - B) * (1 - i / 4);
+      c.beginPath(); c.moveTo(L, y); c.lineTo(W - R, y); c.stroke();
+      c.textAlign = 'right'; c.fillText(String(Math.round(max * i / 4)), L - 4, y + 3);
+    }
+    c.textAlign = 'center';
+    const step = T > 2400 ? 600 : T > 900 ? 300 : 120;
+    for (let t = 0; t <= T; t += step) c.fillText(`${Math.round(t / 60)}m`, L + (W - L - R) * t / T, H - 4);
+    g.players.forEach((p, i) => {
+      c.strokeStyle = p.color; c.lineWidth = i === 0 ? 2.5 : 1.8; c.beginPath();
+      pts.forEach((s, j) => {
+        const x = L + (W - L - R) * s.t / T, y = Tp + (H - Tp - B) * (1 - (s.p[i] ? s.p[i][k] : 0) / max);
+        if (j) c.lineTo(x, y); else c.moveTo(x, y);
+      });
+      c.stroke();
+    });
   }
 }
 

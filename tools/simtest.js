@@ -25,4 +25,4 @@ for (let s = 0; s < steps && !g.over; s++) {
     console.log(`t=${(g.time / 60).toFixed(1)}m\n   ${line}`);
   }
 }
-console.log('over', g.over, 'winner', g.winner, 'sim ms', Date.now() - t0, 'ents', g.ents.size);
+console.log('over', g.over, 'winner', g.winner, 'spielzeit', (g.time / 60).toFixed(1) + ' min', 'sim ms', Date.now() - t0, 'ents', g.ents.size);

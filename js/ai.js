@@ -88,6 +88,7 @@ export class AI {
       if (W >= 18 && count('lumber') < 2) want.push('lumber');
       if (W >= 16 && count('mine') < 2) want.push('mine');
       if (count('tower') < c.towers) want.push('tower');
+      if (W >= 20 && count('temple') < 1) want.push('temple');
     }
     if (p.age >= 2) {
       if (count('workshop') < 1) want.push('workshop');
@@ -366,6 +367,7 @@ export class AI {
         if (!trains.includes(pick)) pick = trains[0];
       } else pick = trains[Math.floor(Math.random() * trains.length)];
       if (UNITS[pick].siege && rams >= 4) continue;
+      if (pick === 'priest' && [...g.ents.values()].filter(e => e.cls === 'u' && e.owner === this.pid && e.type === 'priest').length >= 3) continue;
       if (!this.s.threatNow && this.armySize >= Math.max(6, this.workers * this.cfg.armyRatio)) return;
       if (p.pop >= p.popCap) return;
       const cost = UNITS[pick].cost;
