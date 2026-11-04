@@ -1,11 +1,11 @@
 // Claycrown 2.0: Darstellung auf Canvas (prozedurale Grafik, keine externen Bilder)
 // Terrain wird einmal pro Karte als weiches Gemälde mit Relief gebacken. Darüber liegen Details,
 // Schatten mit wanderndem Sonnenstand, Tag und Nacht mit Lichtquellen, Partikel, Wolken und Vögel.
-import { UNITS, BUILDINGS } from './data.js';
-import { T } from './world.js';
-import { shade, hash, mkCanvas, hexRgb, clamp01, lerp, OUT } from './gfx-util.js';
-import { UNIT_DRAW, UNIT_BOX } from './gfx-units.js';
-import { BUILD_DRAW, BUILD_TOP } from './gfx-buildings.js';
+import { UNITS, BUILDINGS } from './data.js?v=201';
+import { T } from './world.js?v=201';
+import { shade, hash, mkCanvas, hexRgb, clamp01, lerp, OUT } from './gfx-util.js?v=201';
+import { UNIT_DRAW, UNIT_BOX } from './gfx-units.js?v=201';
+import { BUILD_DRAW, BUILD_TOP } from './gfx-buildings.js?v=201';
 
 export { BUILD_TOP };
 export const TILE = 32;

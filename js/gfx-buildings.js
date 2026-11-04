@@ -1,7 +1,7 @@
 // Claycrown 2.0: Gebäudegrafik in schräger Draufsicht.
 // Koordinaten in Kacheln, (0,0) ist die linke obere Ecke der Grundfläche, negative y ragen nach oben.
 // Jede Zeichenfunktion sammelt Ankerpunkte: Fenster für Nachtlicht, Fahnen, Rauch und Feuer.
-import { shade, hash, OUT } from './gfx-util.js';
+import { shade, hash, OUT } from './gfx-util.js?v=201';
 
 const MAT = {
   adobe: { top: '#ecc59a', front: '#cf9564', tex: 'adobe' },

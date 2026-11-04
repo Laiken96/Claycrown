@@ -1,8 +1,8 @@
 // Claycrown 2.0: Simulation
 import {
   SIM_DT, MAX_POP, MONUMENT_TIME, UNITS, BUILDINGS, TECHS, PLAYER_COLORS, PLAYER_NAMES, RES_INFO,
-} from './data.js';
-import { RNG, Heap, valueNoise, clamp } from './util.js';
+} from './data.js?v=201';
+import { RNG, Heap, valueNoise, clamp } from './util.js?v=201';
 
 export const T = { GRASS: 0, WATER: 1, SHALLOW: 2, SAND: 3, DIRT: 4 };
 export const RES_KIND = { tree: 'wood', gold: 'gold', clay: 'clay', berry: 'food' };
