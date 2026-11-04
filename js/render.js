@@ -1,11 +1,11 @@
 // Claycrown 2.0: Darstellung auf Canvas (prozedurale Grafik, keine externen Bilder)
 // Terrain wird einmal pro Karte als weiches Gemälde mit Relief gebacken. Darüber liegen Details,
 // Schatten mit wanderndem Sonnenstand, Tag und Nacht mit Lichtquellen, Partikel, Wolken und Vögel.
-import { UNITS, BUILDINGS } from './data.js?v=201';
-import { T } from './world.js?v=201';
-import { shade, hash, mkCanvas, hexRgb, clamp01, lerp, OUT } from './gfx-util.js?v=201';
-import { UNIT_DRAW, UNIT_BOX } from './gfx-units.js?v=201';
-import { BUILD_DRAW, BUILD_TOP } from './gfx-buildings.js?v=201';
+import { UNITS, BUILDINGS } from './data.js?v=202';
+import { T } from './world.js?v=202';
+import { shade, hash, mkCanvas, hexRgb, clamp01, lerp, OUT } from './gfx-util.js?v=202';
+import { UNIT_DRAW, UNIT_BOX } from './gfx-units.js?v=202';
+import { BUILD_DRAW, BUILD_TOP, setBuildAge } from './gfx-buildings.js?v=202';
 
 export { BUILD_TOP };
 export const TILE = 32;
@@ -357,9 +357,10 @@ export class Renderer {
   }
 
   buildingSprite(type, owner, mask) {
-    const d = BUILDINGS[type], col = this.g.players[owner] ? this.g.players[owner].color : '#888';
-    const key = `b_${type}_${col}${mask != null ? '_' + mask : ''}`;
-    return this.sprite(key, d.w, d.h, BUILD_TOP[type] || 1, (x, A) => BUILD_DRAW[type](x, col, A, mask), PAD);
+    const pl = this.g.players[owner], d = BUILDINGS[type], col = pl ? pl.color : '#888';
+    const age = pl ? pl.age : 1;
+    const key = `b_${type}_${col}_a${age}${mask != null ? '_' + mask : ''}`;
+    return this.sprite(key, d.w, d.h, BUILD_TOP[type] || 1, (x, A) => { setBuildAge(age); BUILD_DRAW[type](x, col, A, mask); setBuildAge(1); }, PAD);
   }
   foundationSprite(w, h) {
     return this.sprite(`f_${w}_${h}`, w, h, 0.6, x => {
@@ -563,6 +564,16 @@ export class Renderer {
 
   // Ereignisse aus der Simulation in Effekte übersetzen
   onEvent(e) {
+    // Zeitalterwechsel: alle sichtbaren Gebäude des Spielers funkeln, während sie im neuen Stil erscheinen
+    if (this.g && e.type === 'age') {
+      for (const b of this.g.blds) {
+        if (b.owner !== e.owner || b.dead || !b.done || !this.inView(b.x, b.y, 4)) continue;
+        if (b.owner !== 0 && !this.seen(b.x, b.y)) continue;
+        for (let i = 0; i < 3 + b.w * b.h; i++) this.emit('glint', b.tx + Math.random() * b.w, b.ty + Math.random() * b.h, { z: 0.3 + Math.random() * 1.6, vz: 0.6, life: 0.9 + Math.random() * 0.8, s: 0.12 });
+        this.burst('dust', b.x, b.ty + b.h, 4, 1.2, { life: 1.2, s: 0.35, c: '230,210,160' });
+      }
+      return;
+    }
     if (!this.g || e.x == null || !this.inView(e.x, e.y, 3) || !this.seen(e.x, e.y)) return;
     switch (e.type) {
       case 'hit':

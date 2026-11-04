@@ -1,7 +1,7 @@
 // Claycrown 2.0: HUD, Auswahlinfo und Befehlsleiste
-import { UNITS, BUILDINGS, TECHS, AGES, ECO_BUILD, MIL_BUILD, DEF_BUILD, RES, RES_INFO } from './data.js?v=201';
-import { RES_KIND } from './world.js?v=201';
-import { costText, fmtTime } from './util.js?v=201';
+import { UNITS, BUILDINGS, TECHS, AGES, ECO_BUILD, MIL_BUILD, DEF_BUILD, RES, RES_INFO } from './data.js?v=202';
+import { RES_KIND } from './world.js?v=202';
+import { costText, fmtTime } from './util.js?v=202';
 
 const $ = id => document.getElementById(id);
 const RES_NAME = { tree: 'Baum', gold: 'Goldvorkommen', clay: 'Lehmgrube', berry: 'Beerenstrauch' };

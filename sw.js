@@ -1,5 +1,5 @@
 // Claycrown Service Worker: Offline Betrieb für Version 2.0 und die klassische Version 1.0
-const CACHE = 'claycrown-v7';
+const CACHE = 'claycrown-v8';
 const FILES = [
   './', './index.html', './manifest.webmanifest', './css/style.css',
   './js/main.js', './js/data.js', './js/util.js', './js/world.js', './js/ai.js', './js/render.js', './js/input.js', './js/ui.js', './js/audio.js',

@@ -27,6 +27,7 @@ Optimiert für iPhone und iPad (Safari, Home-Bildschirm im Vollbild), läuft ebe
 * Tag und Nacht mit wanderndem Sonnenstand, Schatten, beleuchteten Fenstern, Fackeln und Glühwürmchen
 * Partikel: Staub, Funken, Blut, Trümmer, Feuer und Rauch an beschädigten Gebäuden, Holzspäne, Goldglitzern, Einschlagwellen und Kamerawackeln
 * Wolkenschatten, Vogelschwärme, wiegende Bäume, glitzerndes Wasser, Blumen, Schilf und Seerosen
+* Gebäude wandeln sich mit jedem Zeitalter: Lehmzeit roh mit Strohdächern und Palisaden, Brennofenzeit gebrannte Ziegel, Bronzezeit Stein mit Schieferdächern und Bronzeschmuck, Kronenzeit Marmor mit glasierten Dächern und Gold
 * Grafikstufen Niedrig, Mittel und Hoch sowie Tag und Nacht abschaltbar (Hauptmenü und Pause)
 
 ## Fallback: klassische Version 1.0

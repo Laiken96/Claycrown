@@ -1,7 +1,7 @@
 // Claycrown 2.0: Gebäudegrafik in schräger Draufsicht.
 // Koordinaten in Kacheln, (0,0) ist die linke obere Ecke der Grundfläche, negative y ragen nach oben.
 // Jede Zeichenfunktion sammelt Ankerpunkte: Fenster für Nachtlicht, Fahnen, Rauch und Feuer.
-import { shade, hash, OUT } from './gfx-util.js?v=201';
+import { shade, hash, OUT } from './gfx-util.js?v=202';
 
 const MAT = {
   adobe: { top: '#ecc59a', front: '#cf9564', tex: 'adobe' },
@@ -11,7 +11,21 @@ const MAT = {
   wood: { top: '#b4834f', front: '#8a5a33', tex: 'wood' },
   dark: { top: '#8c8780', front: '#6a655e', tex: 'stone' },
   clay: { top: '#e3a77a', front: '#c07a4c', tex: 'adobe' },
+  rough: { top: '#d9b08a', front: '#b5845a', tex: 'adobe' },
+  marble: { top: '#f7f3ea', front: '#dcd4c4', tex: 'stone' },
 };
+
+// Zeitalterstil: Lehmzeit roh, Brennofenzeit gebrannt, Bronzezeit Stein und Bronze, Kronenzeit Marmor und Gold
+let AGE = 1;
+export function setBuildAge(a) { AGE = Math.max(0, Math.min(3, a | 0)); }
+const AGE_MAT = [
+  { brick: 'adobe', stone: 'rough', plaster: 'adobe', dark: 'rough' },
+  {},
+  { adobe: 'brick', brick: 'stone', clay: 'brick' },
+  { adobe: 'marble', brick: 'marble', stone: 'marble', plaster: 'marble', dark: 'stone' },
+];
+const TRIM = [null, null, '#c98f3c', '#f2c53d'];
+const matOf = m => AGE_MAT[AGE][m] || m;
 const WOOD = '#8a5a33', WOOD_D = '#5e3a1f', GOLD = '#f2c53d';
 
 function texture(c, x, y, w, h, tex, seed) {
@@ -57,7 +71,7 @@ function texture(c, x, y, w, h, tex, seed) {
 
 // Quader: Grundfläche x,y,w,d und Höhe z
 function block(c, x, y, w, d, z, mat, seed = 1) {
-  const m = MAT[mat] || MAT.adobe;
+  const m = MAT[matOf(mat)] || MAT.adobe;
   // Vorderseite
   const g = c.createLinearGradient(0, y + d - z, 0, y + d);
   g.addColorStop(0, shade(m.front, 0.08)); g.addColorStop(0.75, m.front); g.addColorStop(1, shade(m.front, -0.3));
@@ -76,10 +90,26 @@ function block(c, x, y, w, d, z, mat, seed = 1) {
   c.strokeRect(x, y - z, w, d); c.strokeRect(x, y + d - z, w, z);
   c.strokeStyle = 'rgba(255,245,225,0.35)'; c.lineWidth = 0.02;
   c.beginPath(); c.moveTo(x + 0.02, y + d - z + 0.015); c.lineTo(x + w - 0.02, y + d - z + 0.015); c.stroke();
+  // Zierband aus Bronze oder Gold ab der Bronzezeit
+  if (TRIM[AGE] && z > 0.35) {
+    c.fillStyle = OUT; c.fillRect(x, y + d - z + 0.05, w, 0.065);
+    c.fillStyle = TRIM[AGE]; c.fillRect(x, y + d - z + 0.06, w, 0.045);
+    c.fillStyle = 'rgba(255,255,255,0.35)'; c.fillRect(x, y + d - z + 0.06, w, 0.015);
+  }
+  // Lehmzeit: Risse und Flickstellen
+  if (AGE === 0 && z > 0.3) {
+    c.strokeStyle = 'rgba(80,45,20,0.4)'; c.lineWidth = 0.018;
+    for (let i = 0; i < Math.ceil(w * 1.5); i++) {
+      const sx = x + hash(seed + 9, i) * w, sy = y + d - z + 0.1 + hash(i, seed + 9) * z * 0.6;
+      c.beginPath(); c.moveTo(sx, sy); c.lineTo(sx + 0.06, sy + 0.12); c.lineTo(sx + 0.02, sy + 0.24); c.stroke();
+    }
+  }
 }
 
 // Satteldach in Spielerfarbe mit Ziegelreihen
 function roof(c, x, y, w, d, z, col, rh = 0.38, ov = 0.08) {
+  if (AGE === 0) return thatch(c, x, y, w, d, z, col, rh, ov + 0.04);
+  if (AGE === 2) col = shade(col, -0.28);
   const top = y - z - ov * 0.5, mid = y + d / 2 - z - rh, bot = y + d - z + ov;
   const back = c.createLinearGradient(0, top, 0, mid);
   back.addColorStop(0, shade(col, 0.05)); back.addColorStop(1, shade(col, 0.32));
@@ -93,19 +123,62 @@ function roof(c, x, y, w, d, z, col, rh = 0.38, ov = 0.08) {
   for (let yy = mid - 0.1; yy > top; yy -= 0.1) { c.beginPath(); c.moveTo(x - ov, yy); c.lineTo(x + w + ov, yy); c.stroke(); }
   c.strokeStyle = 'rgba(20,10,5,0.14)';
   let r = 0;
-  for (let yy = mid; yy < bot - 0.05; yy += 0.1, r++) for (let xx = x - ov + (r % 2) * 0.07; xx < x + w + ov; xx += 0.14) { c.beginPath(); c.moveTo(xx, yy); c.lineTo(xx, yy + 0.1); c.stroke(); }
+  if (AGE === 2) {
+    // Schiefer: Schuppen
+    c.strokeStyle = 'rgba(0,0,0,0.3)'; c.lineWidth = 0.014;
+    for (let yy = mid + 0.02; yy < bot - 0.04; yy += 0.1, r++) for (let xx = x - ov + (r % 2) * 0.07; xx < x + w + ov; xx += 0.14) { c.beginPath(); c.arc(xx + 0.07, yy + 0.03, 0.07, 0.1, Math.PI - 0.1); c.stroke(); }
+  } else for (let yy = mid; yy < bot - 0.05; yy += 0.1, r++) for (let xx = x - ov + (r % 2) * 0.07; xx < x + w + ov; xx += 0.14) { c.beginPath(); c.moveTo(xx, yy); c.lineTo(xx, yy + 0.1); c.stroke(); }
+  if (AGE === 3) {
+    // Glasur: Glanzstreifen
+    const gl = c.createLinearGradient(0, mid, 0, bot);
+    gl.addColorStop(0, 'rgba(255,255,255,0.0)'); gl.addColorStop(0.3, 'rgba(255,255,255,0.28)'); gl.addColorStop(0.5, 'rgba(255,255,255,0)');
+    c.fillStyle = gl; c.fillRect(x - ov, mid, w + ov * 2, bot - mid);
+  }
   c.strokeStyle = OUT; c.lineWidth = 0.032;
   c.strokeRect(x - ov, top, w + ov * 2, bot - top);
   // First
-  c.strokeStyle = shade(col, 0.5); c.lineWidth = 0.035;
+  c.strokeStyle = TRIM[AGE] || shade(col, 0.5); c.lineWidth = TRIM[AGE] ? 0.06 : 0.035;
   c.beginPath(); c.moveTo(x - ov, mid); c.lineTo(x + w + ov, mid); c.stroke();
+  if (TRIM[AGE]) for (const fx of [x - ov, x + w + ov]) { c.fillStyle = OUT; c.beginPath(); c.arc(fx, mid, 0.065, 0, 7); c.fill(); c.fillStyle = TRIM[AGE]; c.beginPath(); c.arc(fx, mid, 0.048, 0, 7); c.fill(); }
   c.strokeStyle = 'rgba(0,0,0,0.25)'; c.lineWidth = 0.02;
   c.beginPath(); c.moveTo(x - ov, mid + 0.03); c.lineTo(x + w + ov, mid + 0.03); c.stroke();
   // Traufschatten
   c.fillStyle = 'rgba(0,0,0,0.25)'; c.fillRect(x, bot, w, 0.06);
 }
 
+// Strohdach der Lehmzeit, First in Spielerfarbe
+function thatch(c, x, y, w, d, z, col, rh, ov) {
+  const top = y - z - ov * 0.5, mid = y + d / 2 - z - rh, bot = y + d - z + ov;
+  const straw = '#c9a85a';
+  c.fillStyle = OUT; c.beginPath(); c.moveTo(x - ov - 0.02, top - 0.02); c.lineTo(x + w + ov + 0.02, top - 0.02); c.lineTo(x + w + ov + 0.04, bot + 0.04); c.quadraticCurveTo(x + w / 2, bot + 0.1, x - ov - 0.04, bot + 0.04); c.closePath(); c.fill();
+  const back = c.createLinearGradient(0, top, 0, mid);
+  back.addColorStop(0, shade(straw, -0.05)); back.addColorStop(1, shade(straw, 0.25));
+  c.fillStyle = back; c.fillRect(x - ov, top, w + ov * 2, mid - top);
+  const front = c.createLinearGradient(0, mid, 0, bot);
+  front.addColorStop(0, straw); front.addColorStop(1, shade(straw, -0.4));
+  c.fillStyle = front; c.beginPath(); c.moveTo(x - ov, mid); c.lineTo(x + w + ov, mid); c.lineTo(x + w + ov + 0.02, bot); c.quadraticCurveTo(x + w / 2, bot + 0.07, x - ov - 0.02, bot); c.closePath(); c.fill();
+  // Halme
+  c.lineWidth = 0.014;
+  for (let i = 0; i < (w + ov * 2) * 22; i++) {
+    const sx = x - ov + hash(i, 3) * (w + ov * 2), sy = mid + hash(4, i) * (bot - mid) * 0.9;
+    c.strokeStyle = hash(i, 7) > 0.5 ? 'rgba(90,60,20,0.35)' : 'rgba(255,240,170,0.35)';
+    c.beginPath(); c.moveTo(sx, sy); c.lineTo(sx + 0.01, sy + 0.12); c.stroke();
+  }
+  for (let i = 0; i < (w + ov * 2) * 10; i++) {
+    const sx = x - ov + hash(i, 13) * (w + ov * 2), sy = top + hash(14, i) * (mid - top);
+    c.strokeStyle = 'rgba(90,60,20,0.25)'; c.beginPath(); c.moveTo(sx, sy); c.lineTo(sx, sy + 0.08); c.stroke();
+  }
+  // gebundener First in Spielerfarbe
+  c.fillStyle = OUT; c.fillRect(x - ov - 0.02, mid - 0.08, w + ov * 2 + 0.04, 0.16);
+  c.fillStyle = col; c.fillRect(x - ov, mid - 0.065, w + ov * 2, 0.13);
+  c.strokeStyle = 'rgba(0,0,0,0.3)'; c.lineWidth = 0.015;
+  for (let xx = x - ov + 0.12; xx < x + w + ov; xx += 0.2) { c.beginPath(); c.moveTo(xx, mid - 0.065); c.lineTo(xx, mid + 0.065); c.stroke(); }
+  c.fillStyle = 'rgba(0,0,0,0.25)'; c.fillRect(x, bot + 0.02, w, 0.06);
+}
+
 function cone(c, cx, by, r, h, col) {
+  if (AGE === 0) col = shade(col, -0.05);
+  if (AGE === 2) col = shade(col, -0.28);
   const g = c.createLinearGradient(cx - r, 0, cx + r, 0);
   g.addColorStop(0, shade(col, 0.35)); g.addColorStop(0.45, col); g.addColorStop(1, shade(col, -0.4));
   c.fillStyle = g;
@@ -114,7 +187,16 @@ function cone(c, cx, by, r, h, col) {
   for (let k = 1; k < 4; k++) { const t = k / 4; c.beginPath(); c.moveTo(cx - r * (1 - t), by - h * t); c.lineTo(cx + r * (1 - t), by - h * t); c.stroke(); }
   c.strokeStyle = OUT; c.lineWidth = 0.03;
   c.beginPath(); c.moveTo(cx - r, by); c.lineTo(cx, by - h); c.lineTo(cx + r, by); c.quadraticCurveTo(cx, by + r * 0.3, cx - r, by); c.stroke();
-  c.fillStyle = GOLD; c.beginPath(); c.arc(cx, by - h, 0.04, 0, 7); c.fill();
+  if (AGE === 0) { c.fillStyle = OUT; c.beginPath(); c.arc(cx, by - h, 0.055, 0, 7); c.fill(); c.fillStyle = '#7a5232'; c.beginPath(); c.arc(cx, by - h, 0.04, 0, 7); c.fill(); }
+  else if (AGE === 1) { c.fillStyle = GOLD; c.beginPath(); c.arc(cx, by - h, 0.04, 0, 7); c.fill(); }
+  else {
+    const t = TRIM[AGE], L = AGE === 3 ? 0.3 : 0.22;
+    c.strokeStyle = OUT; c.lineWidth = 0.05; c.beginPath(); c.moveTo(cx, by - h); c.lineTo(cx, by - h - L); c.stroke();
+    c.strokeStyle = t; c.lineWidth = 0.03; c.beginPath(); c.moveTo(cx, by - h); c.lineTo(cx, by - h - L); c.stroke();
+    c.fillStyle = OUT; c.beginPath(); c.arc(cx, by - h - L * 0.45, AGE === 3 ? 0.07 : 0.055, 0, 7); c.fill();
+    c.fillStyle = t; c.beginPath(); c.arc(cx, by - h - L * 0.45, AGE === 3 ? 0.055 : 0.04, 0, 7); c.fill();
+    if (AGE === 3) { c.strokeStyle = 'rgba(255,255,255,0.6)'; c.lineWidth = 0.012; c.beginPath(); c.arc(cx - 0.015, by - h - L * 0.45 - 0.015, 0.025, 3.5, 5); c.stroke(); }
+  }
 }
 
 function door(c, x, y, w, h, arch = true) {
@@ -144,7 +226,15 @@ function win(c, x, y, w, h, A, warm = true) {
 }
 
 function crenel(c, x, y, w, z, mat) {
-  const m = MAT[mat] || MAT.adobe;
+  const m = MAT[matOf(mat)] || MAT.adobe;
+  if (AGE === 0) {
+    // Lehmzeit: Palisadenspitzen aus Holz statt Zinnen
+    for (let i = 0; i < w - 0.03; i += 0.12) {
+      c.fillStyle = OUT; c.beginPath(); c.moveTo(x + i - 0.01, y - z + 0.02); c.lineTo(x + i + 0.05, y - z - 0.16); c.lineTo(x + i + 0.11, y - z + 0.02); c.fill();
+      c.fillStyle = i % 0.24 < 0.12 ? '#8a5a33' : '#7a4e2c'; c.beginPath(); c.moveTo(x + i, y - z + 0.01); c.lineTo(x + i + 0.05, y - z - 0.14); c.lineTo(x + i + 0.1, y - z + 0.01); c.fill();
+    }
+    return;
+  }
   for (let i = 0; i < w - 0.05; i += 0.26) {
     c.fillStyle = OUT; c.fillRect(x + i - 0.015, y - z - 0.15, 0.17, 0.17);
     c.fillStyle = m.top; c.fillRect(x + i, y - z - 0.14, 0.14, 0.15);
@@ -182,6 +272,7 @@ function banner(c, x, y, col, w = 0.18, h = 0.36) {
   c.fillStyle = col; c.beginPath(); c.moveTo(x, y); c.lineTo(x + w, y); c.lineTo(x + w, y + h); c.lineTo(x + w / 2, y + h - 0.07); c.lineTo(x, y + h); c.fill();
   c.fillStyle = 'rgba(255,255,255,0.25)'; c.fillRect(x, y, w * 0.3, h * 0.9);
   c.fillStyle = GOLD; c.beginPath(); c.arc(x + w / 2, y + h * 0.38, w * 0.22, 0, 7); c.fill();
+  if (AGE === 3) { c.strokeStyle = GOLD; c.lineWidth = 0.02; c.beginPath(); c.moveTo(x, y + h); c.lineTo(x, y); c.lineTo(x + w, y); c.lineTo(x + w, y + h); c.stroke(); }
 }
 
 function anvil(c, x, y) {
