@@ -1,7 +1,7 @@
 // Claycrown 2.0: Gebäudegrafik in schräger Draufsicht.
 // Koordinaten in Kacheln, (0,0) ist die linke obere Ecke der Grundfläche, negative y ragen nach oben.
 // Jede Zeichenfunktion sammelt Ankerpunkte: Fenster für Nachtlicht, Fahnen, Rauch und Feuer.
-import { shade, hash, OUT } from './gfx-util.js?v=202';
+import { shade, hash, OUT } from './gfx-util.js?v=203';
 
 const MAT = {
   adobe: { top: '#ecc59a', front: '#cf9564', tex: 'adobe' },
@@ -303,7 +303,7 @@ function logs(c, x, y, n = 4) {
   }
 }
 
-export const BUILD_DRAW = {
+const BASE = {
   keep(c, col, A) {
     // Ringmauer
     block(c, 0.15, 0.3, 3.7, 3.45, 0.6, 'adobe', 3);
@@ -631,8 +631,427 @@ export const BUILD_DRAW = {
   },
 };
 
+
+// ---------- Bauformen je Zeitalter ----------
+// Rundwand: Zylinder mit Vorderfläche und ovaler Oberseite
+function cylinder(c, cx, by, r, h, mat, seed = 1) {
+  const m = MAT[matOf(mat)] || MAT.adobe, ry = r * 0.45;
+  c.fillStyle = OUT; c.beginPath(); c.moveTo(cx - r - 0.02, by - h); c.lineTo(cx - r - 0.02, by); c.ellipse(cx, by, r + 0.02, ry + 0.02, 0, Math.PI, 0, true); c.lineTo(cx + r + 0.02, by - h); c.closePath(); c.fill();
+  const g = c.createLinearGradient(cx - r, 0, cx + r, 0);
+  g.addColorStop(0, shade(m.front, 0.2)); g.addColorStop(0.4, m.front); g.addColorStop(1, shade(m.front, -0.38));
+  c.fillStyle = g; c.beginPath(); c.moveTo(cx - r, by - h); c.lineTo(cx - r, by); c.ellipse(cx, by, r, ry, 0, Math.PI, 0, true); c.lineTo(cx + r, by - h); c.closePath(); c.fill();
+  c.save(); c.beginPath(); c.moveTo(cx - r, by - h); c.lineTo(cx - r, by); c.ellipse(cx, by, r, ry, 0, Math.PI, 0, true); c.lineTo(cx + r, by - h); c.closePath(); c.clip();
+  texture(c, cx - r, by - h, r * 2, h + ry, m.tex, seed); c.restore();
+  if (TRIM[AGE] && h > 0.4) { c.strokeStyle = TRIM[AGE]; c.lineWidth = 0.045; c.beginPath(); c.ellipse(cx, by - h + 0.1, r, ry, 0, 0, Math.PI); c.stroke(); }
+  c.fillStyle = OUT; c.beginPath(); c.ellipse(cx, by - h, r + 0.02, ry + 0.02, 0, 0, 7); c.fill();
+  c.fillStyle = shade(m.top, 0.05); c.beginPath(); c.ellipse(cx, by - h, r, ry, 0, 0, 7); c.fill();
+}
+
+// Kuppel in Spielerfarbe, ab der Kronenzeit mit Goldspitze
+function dome(c, cx, by, r, h, col) {
+  c.fillStyle = OUT; c.beginPath(); c.ellipse(cx, by, r + 0.03, h + 0.03, 0, Math.PI, 0); c.fill();
+  const g = c.createRadialGradient(cx - r * 0.4, by - h * 0.6, r * 0.05, cx, by - h * 0.3, r * 1.1);
+  g.addColorStop(0, shade(col, 0.5)); g.addColorStop(0.5, col); g.addColorStop(1, shade(col, -0.4));
+  c.fillStyle = g; c.beginPath(); c.ellipse(cx, by, r, h, 0, Math.PI, 0); c.fill();
+  c.strokeStyle = 'rgba(0,0,0,0.2)'; c.lineWidth = 0.015;
+  for (let k = -2; k <= 2; k++) { c.beginPath(); c.ellipse(cx, by, Math.abs(k) * r / 3 + 0.001, h, 0, k < 0 ? Math.PI : Math.PI * 1.5, k < 0 ? Math.PI * 1.5 : Math.PI * 2); c.stroke(); }
+  const t = TRIM[AGE] || GOLD;
+  c.fillStyle = OUT; c.fillRect(cx - r - 0.03, by - 0.04, r * 2 + 0.06, 0.08); c.fillStyle = t; c.fillRect(cx - r, by - 0.03, r * 2, 0.05);
+  c.strokeStyle = OUT; c.lineWidth = 0.05; c.beginPath(); c.moveTo(cx, by - h); c.lineTo(cx, by - h - 0.28); c.stroke();
+  c.strokeStyle = t; c.lineWidth = 0.03; c.beginPath(); c.moveTo(cx, by - h); c.lineTo(cx, by - h - 0.28); c.stroke();
+  c.fillStyle = t; c.beginPath(); c.arc(cx, by - h - 0.12, 0.05, 0, 7); c.fill();
+}
+
+// Rundhütte mit Strohkegel
+function hut(c, cx, by, r, h, col, A, seed = 1) {
+  cylinder(c, cx, by, r, h, 'adobe', seed);
+  const ry = r * 0.45, top = by - h, rr = r + 0.14, H = r * 1.25;
+  c.fillStyle = OUT; c.beginPath(); c.moveTo(cx - rr - 0.03, top + 0.04); c.lineTo(cx, top - H - 0.04); c.lineTo(cx + rr + 0.03, top + 0.04); c.ellipse(cx, top + 0.04, rr + 0.03, ry + 0.06, 0, 0, Math.PI); c.fill();
+  const g = c.createLinearGradient(cx - rr, 0, cx + rr, 0);
+  g.addColorStop(0, '#e2c47a'); g.addColorStop(0.5, '#c9a85a'); g.addColorStop(1, '#8a6e34');
+  c.fillStyle = g; c.beginPath(); c.moveTo(cx - rr, top); c.lineTo(cx, top - H); c.lineTo(cx + rr, top); c.ellipse(cx, top, rr, ry + 0.04, 0, 0, Math.PI); c.fill();
+  c.lineWidth = 0.014;
+  for (let i = 0; i < 26; i++) { const t = hash(i, seed) , a = -rr + t * rr * 2; c.strokeStyle = hash(seed, i) > 0.5 ? 'rgba(90,60,20,0.35)' : 'rgba(255,240,170,0.3)'; c.beginPath(); c.moveTo(cx + a * 0.25, top - H * 0.7); c.lineTo(cx + a, top + ry * 0.6); c.stroke(); }
+  c.strokeStyle = OUT; c.lineWidth = 0.1; c.beginPath(); c.moveTo(cx - rr * 0.72, top - H * 0.3); c.quadraticCurveTo(cx, top - H * 0.3 + ry * 0.6, cx + rr * 0.72, top - H * 0.3); c.stroke();
+  c.strokeStyle = col; c.lineWidth = 0.07; c.beginPath(); c.moveTo(cx - rr * 0.72, top - H * 0.3); c.quadraticCurveTo(cx, top - H * 0.3 + ry * 0.6, cx + rr * 0.72, top - H * 0.3); c.stroke();
+  if (A) A.smoke.push([cx, top - H + 0.05]);
+}
+
+// Holzpfähle für Palisaden
+function stakes(c, x0, x1, y, h) {
+  for (let x = x0; x < x1 - 0.02; x += 0.13) {
+    const hh = h * (0.9 + hash(x * 100 | 0, 7) * 0.2);
+    c.fillStyle = OUT; c.beginPath(); c.moveTo(x - 0.015, y + 0.02); c.lineTo(x - 0.015, y - hh); c.lineTo(x + 0.06, y - hh - 0.12); c.lineTo(x + 0.135, y - hh); c.lineTo(x + 0.135, y + 0.02); c.fill();
+    const g = c.createLinearGradient(x, 0, x + 0.12, 0); g.addColorStop(0, '#a5784a'); g.addColorStop(1, '#6a4424');
+    c.fillStyle = g; c.beginPath(); c.moveTo(x, y); c.lineTo(x, y - hh); c.lineTo(x + 0.06, y - hh - 0.1); c.lineTo(x + 0.12, y - hh); c.lineTo(x + 0.12, y); c.fill();
+  }
+  c.fillStyle = OUT; c.fillRect(x0, y - h * 0.55, x1 - x0, 0.05); c.fillStyle = '#7a5232'; c.fillRect(x0, y - h * 0.55 + 0.01, x1 - x0, 0.03);
+}
+
+// Hölzerner Wachturm auf Stelzen
+function woodTower(c, x, y, w, h, col, A) {
+  for (const px of [x + 0.05, x + w - 0.05]) { c.strokeStyle = OUT; c.lineWidth = 0.08; c.beginPath(); c.moveTo(px, y); c.lineTo(px, y - h); c.stroke(); c.strokeStyle = '#7a5232'; c.lineWidth = 0.05; c.beginPath(); c.moveTo(px, y); c.lineTo(px, y - h); c.stroke(); }
+  c.strokeStyle = '#5e3a1f'; c.lineWidth = 0.03; c.beginPath(); c.moveTo(x + 0.05, y); c.lineTo(x + w - 0.05, y - h * 0.5); c.moveTo(x + w - 0.05, y); c.lineTo(x + 0.05, y - h * 0.5); c.stroke();
+  block(c, x - 0.05, y - h + 0.1, w + 0.1, 0.35, 0.3, 'wood', 3);
+  roof(c, x - 0.05, y - h - 0.25, w + 0.1, 0.4, 0.3, col, 0.15);
+  if (A) pole(c, x + w / 2, y - h - 0.75, 0.5, A);
+}
+
+function dummy(c, x, y) {
+  c.strokeStyle = OUT; c.lineWidth = 0.06; c.beginPath(); c.moveTo(x, y); c.lineTo(x, y - 0.55); c.moveTo(x - 0.16, y - 0.4); c.lineTo(x + 0.16, y - 0.4); c.stroke();
+  c.strokeStyle = '#7a5232'; c.lineWidth = 0.035; c.beginPath(); c.moveTo(x, y); c.lineTo(x, y - 0.55); c.moveTo(x - 0.16, y - 0.4); c.lineTo(x + 0.16, y - 0.4); c.stroke();
+  hay(c, x, y - 0.42); c.fillStyle = '#e2c45a'; c.beginPath(); c.arc(x, y - 0.62, 0.08, 0, 7); c.fill(); c.strokeStyle = OUT; c.lineWidth = 0.02; c.stroke();
+}
+
+function colonnade(c, x, y, w, h, n) {
+  for (let i = 0; i < n; i++) {
+    const px = x + i * (w - 0.14) / (n - 1);
+    c.fillStyle = OUT; c.fillRect(px - 0.015, y - h, 0.17, h);
+    const g = c.createLinearGradient(px, 0, px + 0.14, 0); g.addColorStop(0, '#fffaf0'); g.addColorStop(1, '#cfc0a0');
+    c.fillStyle = g; c.fillRect(px, y - h + 0.01, 0.14, h - 0.01);
+    c.fillStyle = TRIM[AGE] || '#e8dcc4'; c.fillRect(px - 0.03, y - h - 0.02, 0.2, 0.05);
+  }
+  c.fillStyle = OUT; c.fillRect(x - 0.05, y - h - 0.09, w + 0.1, 0.09); c.fillStyle = '#efe4cc'; c.fillRect(x - 0.04, y - h - 0.08, w + 0.08, 0.06);
+}
+
+function sacks(c, x, y) {
+  for (const [dx, dy] of [[0, 0], [0.2, 0.02], [0.1, -0.14]]) { c.fillStyle = OUT; c.beginPath(); c.ellipse(x + dx, y + dy - 0.1, 0.11, 0.12, 0, 0, 7); c.fill(); c.fillStyle = '#e8d8a8'; c.beginPath(); c.ellipse(x + dx, y + dy - 0.1, 0.095, 0.105, 0, 0, 7); c.fill(); c.fillStyle = '#b89a5a'; c.fillRect(x + dx - 0.04, y + dy - 0.2, 0.08, 0.025); }
+}
+
+function sawblade(c, x, y, r) {
+  c.fillStyle = OUT; c.beginPath(); c.arc(x, y, r + 0.03, 0, 7); c.fill();
+  c.fillStyle = '#b8bec8'; c.beginPath();
+  for (let k = 0; k < 24; k++) { const a = k / 24 * Math.PI * 2, rr = k % 2 ? r : r * 0.88; c.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr); }
+  c.fill(); c.fillStyle = '#6a6e76'; c.beginPath(); c.arc(x, y, r * 0.25, 0, 7); c.fill();
+}
+
+function headframe(c, x, y, h) {
+  c.strokeStyle = OUT; c.lineWidth = 0.09;
+  c.beginPath(); c.moveTo(x - 0.35, y); c.lineTo(x, y - h); c.lineTo(x + 0.35, y); c.moveTo(x, y - h); c.lineTo(x, y); c.stroke();
+  c.strokeStyle = '#6b4a2b'; c.lineWidth = 0.055;
+  c.beginPath(); c.moveTo(x - 0.35, y); c.lineTo(x, y - h); c.lineTo(x + 0.35, y); c.moveTo(x, y - h); c.lineTo(x, y); c.stroke();
+  c.strokeStyle = '#5e3a1f'; c.lineWidth = 0.025; for (let k = 1; k < 4; k++) { const t = k / 4; c.beginPath(); c.moveTo(x - 0.35 * (1 - t), y - h * t); c.lineTo(x + 0.35 * (1 - t), y - h * t); c.stroke(); }
+  c.fillStyle = OUT; c.beginPath(); c.arc(x, y - h, 0.2, 0, 7); c.fill();
+  c.fillStyle = '#4a4d52'; c.beginPath(); c.arc(x, y - h, 0.17, 0, 7); c.fill();
+  c.strokeStyle = '#2a2a2a'; c.lineWidth = 0.02; for (let k = 0; k < 6; k++) { c.beginPath(); c.moveTo(x, y - h); c.lineTo(x + Math.cos(k) * 0.16, y - h + Math.sin(k) * 0.16); c.stroke(); }
+}
+
+const V = {
+  keep(c, col, A) {
+    if (AGE === 0) {
+      // Palisadenhof mit Langhaus und hölzernem Wachturm
+      c.fillStyle = 'rgba(120,90,55,0.55)'; c.fillRect(0.2, 0.4, 3.6, 3.3);
+      stakes(c, 0.12, 3.9, 0.45, 0.55);
+      woodTower(c, 2.95, 0.95, 0.75, 1.5, col, A);
+      block(c, 0.55, 1.25, 2.35, 1.55, 0.65, 'adobe', 4);
+      roof(c, 0.55, 1.25, 2.35, 1.55, 0.65, col, 0.45);
+      A.smoke.push([1.2, 1.25 - 0.95]);
+      door(c, 1.45, 2.8, 0.55, 0.5, false);
+      win(c, 0.85, 2.8 - 0.32, 0.18, 0.16, A); win(c, 2.35, 2.8 - 0.32, 0.18, 0.16, A);
+      for (const [x, y] of [[0.4, 1.0], [0.4, 2.3]]) hay(c, x, y);
+      barrel(c, 3.2, 2.7); crate(c, 3.35, 3.0);
+      stakes(c, 0.12, 1.45, 3.8, 0.6); stakes(c, 2.55, 3.9, 3.8, 0.6);
+      c.fillStyle = OUT; c.fillRect(1.42, 3.8 - 0.85, 0.08, 0.87); c.fillRect(2.5, 3.8 - 0.85, 0.08, 0.87); c.fillRect(1.42, 3.8 - 0.88, 1.16, 0.08);
+      c.fillStyle = '#7a5232'; c.fillRect(1.44, 3.8 - 0.86, 1.12, 0.05);
+      torch(c, 1.38, 3.8 - 0.55, A); torch(c, 2.62, 3.8 - 0.55, A);
+      return true;
+    }
+    if (AGE === 2) {
+      BASE.keep(c, col, A);
+      // höherer Bergfried und Torhaus
+      block(c, 1.3, 1.0, 1.4, 1.35, 2.5, 'brick', 8); crenel(c, 1.3, 1.0, 1.4, 2.5, 'brick');
+      win(c, 1.65, 2.35 - 2.0, 0.14, 0.22, A); win(c, 2.2, 2.35 - 2.0, 0.14, 0.22, A);
+      banner(c, 1.85, 2.35 - 1.55, col, 0.3, 0.6);
+      pole(c, 2.0, 1.0 - 2.5 - 0.15, 0.75, A);
+      for (const x of [1.15, 2.45]) { block(c, x, 3.2, 0.42, 0.55, 1.15, 'adobe', x * 9); cone(c, x + 0.21, 3.2 - 1.1, 0.3, 0.55, col); }
+      door(c, 1.62, 3.75, 0.76, 0.6);
+      return true;
+    }
+    if (AGE === 3) {
+      // Palast: Marmorhof, schlanke Türme, Kuppel
+      block(c, 0.15, 0.3, 3.7, 3.45, 0.55, 'adobe', 3);
+      c.fillStyle = '#e8e0cf'; c.fillRect(0.45, 0.02, 3.1, 2.7);
+      crenel(c, 0.15, 0.3, 3.7, 0.55, 'adobe');
+      for (const [x, y] of [[0.05, 0.15], [3.35, 0.15]]) { cylinder(c, x + 0.3, y + 0.5, 0.3, 2.1, 'adobe', x * 5); dome(c, x + 0.3, y + 0.5 - 2.1, 0.3, 0.4, col); }
+      block(c, 0.85, 0.75, 2.3, 1.9, 1.35, 'adobe', 4);
+      colonnade(c, 0.95, 2.65, 2.1, 1.1, 6);
+      dome(c, 2.0, 0.75 - 1.35 + 0.95, 0.85, 0.95, col);
+      win(c, 1.3, 2.65 - 0.4, 0.14, 0.24, A); win(c, 2.55, 2.65 - 0.4, 0.14, 0.24, A); A.lights.push([2.0, 2.2, 1.6]);
+      for (const [x, y] of [[0.05, 3.05], [3.35, 3.05]]) { cylinder(c, x + 0.3, y + 0.55, 0.3, 1.5, 'adobe', y); dome(c, x + 0.3, y + 0.55 - 1.5, 0.3, 0.4, col); }
+      banner(c, 1.1, 3.75 - 0.5, col, 0.22, 0.42); banner(c, 2.68, 3.75 - 0.5, col, 0.22, 0.42);
+      door(c, 1.62, 3.75, 0.76, 0.62);
+      torch(c, 1.45, 3.75 - 0.42, A); torch(c, 2.55, 3.75 - 0.42, A);
+      pole(c, 0.35, 0.65 - 2.5 - 0.3, 0.5, A); pole(c, 3.65, 0.65 - 2.5 - 0.3, 0.5, A);
+      return true;
+    }
+  },
+
+  house(c, col, A) {
+    if (AGE === 0) { hut(c, 0.95, 1.65, 0.62, 0.45, col, A, 3); door(c, 0.8, 1.9, 0.3, 0.36); c.fillStyle = OUT; c.beginPath(); c.ellipse(1.75, 1.85, 0.14, 0.07, 0, 0, 7); c.fill(); c.fillStyle = '#6a6e76'; c.beginPath(); c.ellipse(1.75, 1.84, 0.12, 0.055, 0, 0, 7); c.fill(); A.fire.push([1.75, 1.8, 0.4]); A.lights.push([0.95, 1.6, 0.8], [1.75, 1.78, 1.0]); return true; }
+    if (AGE === 2) {
+      block(c, 0.2, 0.4, 1.6, 1.35, 1.1, 'plaster', 7);
+      c.strokeStyle = '#5e3a1f'; c.lineWidth = 0.045;
+      const fy = 1.75 - 1.1;
+      c.beginPath(); c.moveTo(0.2, fy + 0.02); c.lineTo(1.8, fy + 0.02); c.moveTo(0.2, fy + 0.55); c.lineTo(1.8, fy + 0.55);
+      for (const x of [0.22, 0.75, 1.25, 1.78]) { c.moveTo(x, fy); c.lineTo(x, 1.75); }
+      c.stroke();
+      roof(c, 0.2, 0.4, 1.6, 1.35, 1.1, col, 0.38);
+      block(c, 1.38, 0.32, 0.18, 0.16, 1.45, 'brick', 2); A.smoke.push([1.47, 0.32 - 1.45 + 0.02]);
+      win(c, 0.38, fy + 0.4, 0.2, 0.22, A); win(c, 0.92, fy + 0.4, 0.2, 0.22, A); win(c, 1.45, fy + 0.4, 0.2, 0.22, A);
+      // Balkon
+      c.fillStyle = OUT; c.fillRect(0.82, fy + 0.5, 0.42, 0.08); c.fillStyle = '#8a5a33'; c.fillRect(0.83, fy + 0.51, 0.4, 0.05);
+      door(c, 0.88, 1.75, 0.3, 0.44); win(c, 0.4, 1.75 - 0.2, 0.2, 0.2, A); win(c, 1.42, 1.75 - 0.2, 0.2, 0.2, A);
+      return true;
+    }
+    if (AGE === 3) {
+      block(c, 0.12, 0.5, 1.3, 1.25, 0.95, 'plaster', 7);
+      roof(c, 0.12, 0.5, 1.3, 1.25, 0.95, col, 0.32);
+      cylinder(c, 1.6, 1.6, 0.27, 1.45, 'plaster', 5);
+      cone(c, 1.6, 1.6 - 1.45, 0.34, 0.6, col);
+      win(c, 1.53, 1.6 - 0.95, 0.14, 0.22, A);
+      for (const x of [0.3, 1.0]) door(c, x, 1.75 - 0.42, 0.16, 0.28);
+      door(c, 0.62, 1.75, 0.3, 0.46);
+      A.smoke.push([0.5, 0.5 - 1.2]); block(c, 0.42, 0.45, 0.16, 0.14, 1.25, 'brick', 2);
+      return true;
+    }
+  },
+
+  mill(c, col, A) {
+    if (AGE === 0) {
+      // Kornspeicher auf Stelzen, Handmühlstein
+      for (const x of [0.4, 1.5]) for (const y of [0.85, 1.45]) { c.fillStyle = OUT; c.fillRect(x - 0.05, y - 0.45, 0.1, 0.47); c.fillStyle = '#7a5232'; c.fillRect(x - 0.035, y - 0.44, 0.07, 0.45); }
+      block(c, 0.3, 0.55, 1.3, 0.85, 0.5, 'wood', 3); roof(c, 0.3, 0.1, 1.3, 0.9, 0.35, col, 0.3);
+      c.fillStyle = OUT; c.beginPath(); c.ellipse(1.45, 1.75, 0.3, 0.14, 0, 0, 7); c.fill();
+      c.fillStyle = '#9a958c'; c.beginPath(); c.ellipse(1.45, 1.72, 0.27, 0.12, 0, 0, 7); c.fill();
+      c.fillStyle = '#c4c0b6'; c.beginPath(); c.ellipse(1.45, 1.68, 0.18, 0.08, 0, 0, 7); c.fill();
+      c.strokeStyle = '#6b4a2b'; c.lineWidth = 0.035; c.beginPath(); c.moveTo(1.45, 1.66); c.lineTo(1.75, 1.5); c.stroke();
+      sacks(c, 0.35, 1.85);
+      return true;
+    }
+    if (AGE >= 2) {
+      // hohe Turmwindmühle
+      const h = AGE === 3 ? 1.75 : 1.6;
+      cylinder(c, 1.0, 1.6, 0.55, h, 'stone', 11);
+      if (AGE === 3) { c.fillStyle = OUT; c.beginPath(); c.ellipse(1.0, 1.6 - h * 0.55, 0.72, 0.3, 0, 0, Math.PI); c.fill(); c.strokeStyle = GOLD; c.lineWidth = 0.035; c.beginPath(); c.ellipse(1.0, 1.6 - h * 0.55, 0.7, 0.28, 0, 0, Math.PI); c.stroke(); for (let k = 0; k < 7; k++) { const a = k / 6 * Math.PI; c.beginPath(); c.moveTo(1.0 + Math.cos(a) * 0.7, 1.6 - h * 0.55 + Math.sin(a) * 0.28); c.lineTo(1.0 + Math.cos(a) * 0.7, 1.6 - h * 0.55 + Math.sin(a) * 0.28 - 0.16); c.stroke(); } }
+      if (AGE === 3) dome(c, 1.0, 1.6 - h, 0.55, 0.45, col); else cone(c, 1.0, 1.6 - h, 0.6, 0.6, col);
+      door(c, 0.86, 1.95, 0.28, 0.45);
+      win(c, 0.94, 1.6 - h * 0.6, 0.13, 0.2, A);
+      sacks(c, 1.6, 1.95);
+      A.mill = [1.0, 1.6 - h - 0.05];
+      return true;
+    }
+  },
+
+  lumber(c, col, A) {
+    if (AGE === 0) {
+      for (const x of [0.25, 1.75]) { c.fillStyle = OUT; c.fillRect(x - 0.05, 1.5 - 0.75, 0.1, 0.77); c.fillStyle = '#7a5232'; c.fillRect(x - 0.035, 1.5 - 0.74, 0.07, 0.75); }
+      roof(c, 0.15, 0.5, 1.7, 0.9, 0.45, col, 0.2);
+      logs(c, 0.45, 1.9, 4);
+      c.fillStyle = OUT; c.beginPath(); c.ellipse(1.7, 1.75, 0.16, 0.09, 0, 0, 7); c.fill(); c.fillStyle = '#d9b07a'; c.beginPath(); c.ellipse(1.7, 1.73, 0.13, 0.07, 0, 0, 7); c.fill();
+      c.strokeStyle = '#5e3a1f'; c.lineWidth = 0.03; c.beginPath(); c.moveTo(1.7, 1.72); c.lineTo(1.8, 1.48); c.stroke();
+      return true;
+    }
+    if (AGE >= 2) {
+      block(c, 0.15, 0.5, 1.25, 1.1, 0.75, 'wood', 13); roof(c, 0.15, 0.5, 1.25, 1.1, 0.75, col, 0.3);
+      door(c, 0.5, 1.6, 0.5, 0.5, false);
+      sawblade(c, 1.65, 1.2, 0.26);
+      c.fillStyle = OUT; c.fillRect(1.25, 1.42, 0.8, 0.12); c.fillStyle = '#a07040'; c.fillRect(1.27, 1.43, 0.76, 0.09);
+      logs(c, 0.35, 1.95, 3); logs(c, 1.35, 1.95, 2);
+      if (AGE === 3) { c.strokeStyle = OUT; c.lineWidth = 0.08; c.beginPath(); c.moveTo(1.9, 1.9); c.lineTo(1.9, -0.4); c.lineTo(1.3, -0.65); c.stroke(); c.strokeStyle = '#6b4a2b'; c.lineWidth = 0.05; c.beginPath(); c.moveTo(1.9, 1.9); c.lineTo(1.9, -0.4); c.lineTo(1.3, -0.65); c.stroke(); c.strokeStyle = '#ccc'; c.lineWidth = 0.012; c.beginPath(); c.moveTo(1.35, -0.62); c.lineTo(1.35, 0.1); c.stroke(); logs(c, 1.25, 0.25, 1); }
+      return true;
+    }
+  },
+
+  mine(c, col, A) {
+    if (AGE === 0) {
+      // Felsen mit verzimmertem Stolleneingang
+      for (const [x, y, r] of [[0.55, 1.2, 0.55], [1.35, 1.05, 0.6], [1.0, 0.7, 0.5]]) { c.fillStyle = OUT; c.beginPath(); c.ellipse(x, y, r + 0.03, r * 0.75 + 0.03, 0, 0, 7); c.fill(); const g = c.createLinearGradient(x - r, y - r, x + r, y + r); g.addColorStop(0, '#b8b2a6'); g.addColorStop(1, '#6a655e'); c.fillStyle = g; c.beginPath(); c.ellipse(x, y, r, r * 0.75, 0, 0, 7); c.fill(); }
+      c.fillStyle = '#1a120c'; c.fillRect(0.8, 1.15, 0.45, 0.5);
+      c.fillStyle = OUT; c.fillRect(0.74, 1.08, 0.09, 0.6); c.fillRect(1.22, 1.08, 0.09, 0.6); c.fillRect(0.7, 1.05, 0.65, 0.09);
+      c.fillStyle = '#7a5232'; c.fillRect(0.76, 1.1, 0.05, 0.56); c.fillRect(1.24, 1.1, 0.05, 0.56); c.fillRect(0.72, 1.07, 0.61, 0.05);
+      c.fillStyle = OUT; c.fillRect(1.4, 1.5, 0.5, 0.28); c.fillStyle = '#5e3a1f'; c.fillRect(1.42, 1.52, 0.46, 0.24);
+      c.fillStyle = '#ffd23a'; c.beginPath(); c.arc(1.55, 1.5, 0.07, 0, 7); c.arc(1.72, 1.48, 0.06, 0, 7); c.fill();
+      torch(c, 0.62, 1.4, A);
+      return true;
+    }
+    if (AGE >= 2) {
+      headframe(c, 1.55, 1.0, 1.4);
+      BASE.mine(c, col, A);
+      if (AGE === 3) for (const [x, y] of [[0.3, 1.95], [0.55, 1.98]]) { c.fillStyle = OUT; c.beginPath(); c.ellipse(x, y - 0.06, 0.13, 0.08, 0, 0, 7); c.fill(); c.fillStyle = GOLD; c.beginPath(); c.ellipse(x, y - 0.07, 0.11, 0.065, 0, 0, 7); c.fill(); }
+      return true;
+    }
+  },
+
+  barracks(c, col, A) {
+    if (AGE === 0) {
+      block(c, 0.25, 0.5, 2.5, 1.4, 0.6, 'wood', 19); roof(c, 0.25, 0.5, 2.5, 1.4, 0.6, col, 0.42);
+      door(c, 1.25, 1.9, 0.5, 0.48, false);
+      win(c, 0.55, 1.9 - 0.3, 0.18, 0.16, A); win(c, 2.25, 1.9 - 0.3, 0.18, 0.16, A);
+      dummy(c, 0.6, 2.65); dummy(c, 1.5, 2.75); dummy(c, 2.4, 2.65);
+      stakes(c, 0.1, 2.9, 2.95, 0.3);
+      torch(c, 1.12, 1.9 - 0.32, A);
+      return true;
+    }
+    if (AGE >= 2) {
+      block(c, 2.25, 0.1, 0.65, 0.6, AGE === 3 ? 2.1 : 1.8, 'brick', 9); crenel(c, 2.25, 0.1, 0.65, AGE === 3 ? 2.1 : 1.8, 'brick');
+      if (AGE === 3) { block(c, 0.1, 0.1, 0.65, 0.6, 2.1, 'brick', 10); crenel(c, 0.1, 0.1, 0.65, 2.1, 'brick'); cone(c, 0.425, 0.1 - 2.05, 0.42, 0.6, col); cone(c, 2.575, 0.1 - 2.05, 0.42, 0.6, col); }
+      else pole(c, 2.575, 0.1 - 1.95, 0.6, A);
+      BASE.barracks(c, col, A);
+      if (AGE === 3) colonnade(c, 0.35, 2.55, 2.3, 0.75, 6);
+      return true;
+    }
+  },
+
+  range(c, col, A) {
+    if (AGE >= 2) {
+      if (AGE === 3) { block(c, 0.05, 0.15, 0.6, 0.55, 1.9, 'stone', 4); crenel(c, 0.05, 0.15, 0.6, 1.9, 'stone'); pole(c, 0.35, 0.15 - 2.0, 0.55, A); }
+      BASE.range(c, col, A);
+      // überdachter Schießgang
+      for (const x of [0.25, 2.75]) { c.fillStyle = OUT; c.fillRect(x - 0.04, 2.3 - 0.75, 0.08, 0.77); c.fillStyle = '#7a5232'; c.fillRect(x - 0.025, 2.3 - 0.74, 0.05, 0.75); }
+      roof(c, 0.2, 2.05, 2.6, 0.3, 0.75, col, 0.08, 0.05);
+      return true;
+    }
+  },
+
+  stable(c, col, A) {
+    if (AGE >= 2) {
+      if (AGE === 3) { cylinder(c, 2.6, 0.75, 0.3, 1.9, 'stone', 3); cone(c, 2.6, 0.75 - 1.9, 0.38, 0.6, col); }
+      BASE.stable(c, col, A);
+      // Heuboden mit Luke
+      block(c, 1.15, 0.4, 0.7, 0.4, 1.2, 'wood', 6); roof(c, 1.15, 0.4, 0.7, 0.4, 1.2, col, 0.2);
+      c.fillStyle = OUT; c.fillRect(1.36, 0.8 - 1.12, 0.28, 0.3); c.fillStyle = '#e2c45a'; c.fillRect(1.38, 0.8 - 1.1, 0.24, 0.26);
+      return true;
+    }
+  },
+
+  forge(c, col, A) {
+    if (AGE >= 2) {
+      block(c, 0.55, 0.45, 0.35, 0.32, AGE === 3 ? 2.1 : 1.5, AGE === 3 ? 'stone' : 'brick', 3); A.smoke.push([0.72, 0.45 - (AGE === 3 ? 2.1 : 1.5)]);
+      BASE.forge(c, col, A);
+      // Blasebalg
+      c.fillStyle = OUT; c.beginPath(); c.moveTo(0.3, 2.55); c.lineTo(0.7, 2.45); c.lineTo(0.7, 2.75); c.closePath(); c.fill();
+      c.fillStyle = '#6e4527'; c.beginPath(); c.moveTo(0.34, 2.56); c.lineTo(0.67, 2.48); c.lineTo(0.67, 2.72); c.closePath(); c.fill();
+      if (AGE === 3) { c.fillStyle = OUT; c.fillRect(0.5, 0.45 - 2.18, 0.45, 0.1); c.fillStyle = GOLD; c.fillRect(0.52, 0.45 - 2.17, 0.41, 0.07); }
+      return true;
+    }
+  },
+
+  kiln(c, col, A) {
+    if (AGE >= 2) {
+      c.fillStyle = OUT; c.beginPath(); c.ellipse(0.6, 1.0, 0.42, 0.5, 0, Math.PI, 0); c.fill();
+      c.fillStyle = '#a85a32'; c.beginPath(); c.ellipse(0.6, 1.0, 0.39, 0.47, 0, Math.PI, 0); c.fill(); texture(c, 0.22, 0.53, 0.76, 0.47, 'brick', 9);
+      if (AGE === 3) { block(c, 1.5, -0.2, 0.24, 0.22, 0.9, 'stone', 4); A.smoke.push([1.62, -1.1]); }
+      BASE.kiln(c, col, A);
+      return true;
+    }
+  },
+
+  market(c, col, A) {
+    if (AGE >= 2) {
+      // Markthalle im Hintergrund
+      block(c, 0.4, 0.05, 2.2, 0.75, 0.9, 'stone', 5);
+      if (AGE === 3) dome(c, 1.5, 0.05 - 0.9 + 0.35, 0.75, 0.7, col);
+      else roof(c, 0.4, 0.05, 2.2, 0.75, 0.9, col, 0.25);
+      for (let i = 0; i < 4; i++) door(c, 0.62 + i * 0.5, 0.8, 0.24, 0.4);
+      BASE.market(c, col, A);
+      return true;
+    }
+  },
+
+  kennel(c, col, A) {
+    if (AGE >= 2) {
+      block(c, 1.2, 0.15, 0.65, 0.5, 0.45, 'wood', 4); roof(c, 1.2, 0.15, 0.65, 0.5, 0.45, col, 0.18);
+      BASE.kennel(c, col, A);
+      if (AGE === 3) { cylinder(c, 0.25, 1.1, 0.18, 1.1, 'stone', 3); cone(c, 0.25, 1.1 - 1.1, 0.24, 0.4, col); }
+      return true;
+    }
+  },
+
+  temple(c, col, A) {
+    if (AGE >= 2) {
+      // Glockenturm
+      block(c, 2.35, 0.25, 0.55, 0.55, 2.2, 'plaster', 6);
+      c.fillStyle = OUT; c.fillRect(2.47, 0.8 - 1.95, 0.31, 0.36); c.fillStyle = '#2a1c14'; c.fillRect(2.5, 0.8 - 1.92, 0.25, 0.3);
+      c.fillStyle = TRIM[AGE]; c.beginPath(); c.ellipse(2.625, 0.8 - 1.72, 0.08, 0.1, 0, Math.PI, 0); c.fill();
+      cone(c, 2.625, 0.25 - 2.2 + 0.05, 0.36, 0.6, col);
+      BASE.temple(c, col, A);
+      if (AGE === 3) { dome(c, 1.5, 0.85 - 1.05 + 0.15, 0.7, 0.7, col); for (const x of [0.55, 2.45]) dome(c, x, 2.45 - 1.02, 0.18, 0.2, col); }
+      return true;
+    }
+  },
+
+  tower(c, col, A) {
+    if (AGE === 2) {
+      block(c, 0.35, 0.6, 1.3, 1.15, 2.75, 'stone', 47);
+      // Wehrgang mit Überhang
+      block(c, 0.25, 0.5, 1.5, 0.35, 0.35, 'stone', 3);
+      c.fillStyle = OUT; c.fillRect(0.25, 1.75 - 2.75 + 0.02, 1.5, 0.12);
+      for (let x = 0.3; x < 1.7; x += 0.2) { c.fillStyle = '#4a4540'; c.fillRect(x, 1.75 - 2.75 + 0.04, 0.08, 0.1); }
+      crenel(c, 0.25, 0.6, 1.5, 2.85, 'stone');
+      win(c, 0.92, 1.75 - 1.95, 0.16, 0.28, A); win(c, 0.92, 1.75 - 1.05, 0.16, 0.24, A);
+      cone(c, 1.0, 0.6 - 2.85 + 0.1, 0.8, 1.0, col);
+      door(c, 0.86, 1.75, 0.28, 0.42);
+      pole(c, 1.0, 0.6 - 2.85 - 1.05, 0.5, A);
+      return true;
+    }
+    if (AGE === 3) {
+      cylinder(c, 1.0, 1.6, 0.6, 2.8, 'stone', 47);
+      crenel(c, 0.45, 1.6 - 0.27, 1.1, 2.8, 'stone');
+      win(c, 0.93, 1.6 - 1.9, 0.15, 0.28, A); win(c, 0.93, 1.6 - 1.05, 0.15, 0.24, A);
+      dome(c, 1.0, 1.6 - 2.85, 0.5, 0.6, col);
+      door(c, 0.86, 1.82, 0.28, 0.42);
+      pole(c, 1.0, 1.6 - 2.85 - 0.85, 0.45, A);
+      return true;
+    }
+  },
+
+  workshop(c, col, A) {
+    if (AGE === 3) {
+      block(c, 0.15, 0.15, 0.6, 0.55, 1.7, 'stone', 3); crenel(c, 0.15, 0.15, 0.6, 1.7, 'stone'); pole(c, 0.45, 0.15 - 1.8, 0.5, A);
+      BASE.workshop(c, col, A);
+      return true;
+    }
+  },
+
+  fortress(c, col, A) {
+    if (AGE === 3) {
+      BASE.fortress(c, col, A);
+      for (const [x, y] of [[-0.05, 0.1], [3.2, 0.1]]) dome(c, x + 0.425, y + 0.8 - 1.55 - 0.65 + 0.15, 0.34, 0.4, col);
+      return true;
+    }
+  },
+
+  bastion(c, col, A) {
+    if (AGE === 3) { BASE.bastion(c, col, A); dome(c, 0.4, 0.75 - 1.6 + 0.05, 0.16, 0.2, col); dome(c, 1.6, 0.75 - 1.6 + 0.05, 0.16, 0.2, col); return true; }
+  },
+
+  wall(c, col, A, mask = 0) {
+    if (AGE === 0) {
+      // Pfahlwand
+      const hz = 0.7;
+      if (mask & 12) { const y0 = mask & 8 ? 0 : 0.35, y1 = mask & 4 ? 1 : 0.65; for (let y = y0; y < y1; y += 0.14) stakes(c, 0.42, 0.58, y + 0.14, hz); }
+      if ((mask & 3) || !(mask & 12)) stakes(c, mask & 2 ? 0 : 0.25, mask & 1 ? 1 : 0.75, 0.62, hz);
+      return true;
+    }
+    if (AGE >= 2) {
+      const z = AGE === 3 ? 1.05 : 0.92, m = 'adobe';
+      const x0 = mask & 2 ? 0 : 0.18, x1 = mask & 1 ? 1 : 0.82, y0 = mask & 8 ? 0 : 0.22, y1 = mask & 4 ? 1 : 0.78;
+      if (mask & 12) block(c, 0.22, y0, 0.56, y1 - y0, z, m, 5);
+      if ((mask & 3) || !(mask & 12)) block(c, x0, 0.22, x1 - x0, 0.56, z, m, 3);
+      // Wehrgang
+      c.fillStyle = 'rgba(0,0,0,0.18)'; c.fillRect((mask & 12) && !(mask & 3) ? 0.3 : x0, 0.3 - z, (mask & 12) && !(mask & 3) ? 0.4 : x1 - x0, 0.08);
+      crenel(c, (mask & 12) && !(mask & 3) ? 0.22 : x0, 0.22 + 0.56 - 0.56, (mask & 12) && !(mask & 3) ? 0.56 : x1 - x0, z, m);
+      if (!mask) { block(c, 0.15, 0.15, 0.7, 0.7, z + 0.2, m, 9); crenel(c, 0.15, 0.15, 0.7, z + 0.2, m); }
+      return true;
+    }
+  },
+};
+
+export const BUILD_DRAW = {};
+for (const k of Object.keys(BASE)) BUILD_DRAW[k] = (c, col, A, mask) => { if (!(V[k] && V[k](c, col, A, mask))) BASE[k](c, col, A, mask); };
+
 export const BUILD_TOP = {
-  keep: 2.3, house: 1.25, mill: 1.6, lumber: 1.05, mine: 1.05, barracks: 1.45, range: 1.3, stable: 1.35, forge: 1.7,
-  temple: 2.0, tower: 3.5, workshop: 1.5, monument: 2.4, farm: 0, kennel: 0.85, fortress: 3.6, bastion: 2.45, wall: 1.0,
-  market: 0.5, kiln: 1.0,
+  keep: 3.3, house: 2.0, mill: 2.6, lumber: 1.6, mine: 1.7, barracks: 2.7, range: 2.2, stable: 2.0, forge: 2.4,
+  temple: 2.5, tower: 4.3, workshop: 2.1, monument: 2.4, farm: 0, kennel: 1.2, fortress: 3.95, bastion: 2.45, wall: 1.4,
+  market: 1.6, kiln: 1.3,
 };

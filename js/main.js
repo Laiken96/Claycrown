@@ -1,11 +1,11 @@
 // Claycrown 2.0: Start, Spielschleife und Steuerung
-import { SIM_DT, UNITS, BUILDINGS, AGES, VERSION } from './data.js?v=202';
-import { Game } from './world.js?v=202';
-import { AI } from './ai.js?v=202';
-import { Renderer, BUILD_TOP } from './render.js?v=202';
-import { Input } from './input.js?v=202';
-import { UI } from './ui.js?v=202';
-import { Sound } from './audio.js?v=202';
+import { SIM_DT, UNITS, BUILDINGS, AGES, VERSION } from './data.js?v=203';
+import { Game } from './world.js?v=203';
+import { AI } from './ai.js?v=203';
+import { Renderer, BUILD_TOP } from './render.js?v=203';
+import { Input } from './input.js?v=203';
+import { UI } from './ui.js?v=203';
+import { Sound } from './audio.js?v=203';
 
 const $ = id => document.getElementById(id);
 const SAVE_KEY = 'claycrown.save.v2';

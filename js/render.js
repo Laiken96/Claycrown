@@ -1,11 +1,11 @@
 // Claycrown 2.0: Darstellung auf Canvas (prozedurale Grafik, keine externen Bilder)
 // Terrain wird einmal pro Karte als weiches Gemälde mit Relief gebacken. Darüber liegen Details,
 // Schatten mit wanderndem Sonnenstand, Tag und Nacht mit Lichtquellen, Partikel, Wolken und Vögel.
-import { UNITS, BUILDINGS } from './data.js?v=202';
-import { T } from './world.js?v=202';
-import { shade, hash, mkCanvas, hexRgb, clamp01, lerp, OUT } from './gfx-util.js?v=202';
-import { UNIT_DRAW, UNIT_BOX } from './gfx-units.js?v=202';
-import { BUILD_DRAW, BUILD_TOP, setBuildAge } from './gfx-buildings.js?v=202';
+import { UNITS, BUILDINGS } from './data.js?v=203';
+import { T } from './world.js?v=203';
+import { shade, hash, mkCanvas, hexRgb, clamp01, lerp, OUT } from './gfx-util.js?v=203';
+import { UNIT_DRAW, UNIT_BOX } from './gfx-units.js?v=203';
+import { BUILD_DRAW, BUILD_TOP, setBuildAge } from './gfx-buildings.js?v=203';
 
 export { BUILD_TOP };
 export const TILE = 32;
@@ -472,8 +472,8 @@ export class Renderer {
 
   // Bauernhof je Wachstumsstufe
   farmSprite(owner, stage) {
-    const col = this.g.players[owner].color;
-    return this.sprite(`farm_${col}_${stage}`, 3, 3, 0.35, x => {
+    const col = this.g.players[owner].color, age = this.g.players[owner].age;
+    return this.sprite(`farm_${col}_${stage}_a${age}`, 3, 3, 0.35, x => {
       x.fillStyle = '#7a5a32'; x.fillRect(0.1, 0.1, 2.8, 2.8);
       for (let i = 0; i < 9; i++) {
         const y = 0.25 + i * 0.3;
@@ -486,6 +486,26 @@ export class Renderer {
           x.beginPath(); x.moveTo(px, y + 0.06); x.lineTo(px - 0.02, y + 0.06 - h); x.moveTo(px, y + 0.06); x.lineTo(px + 0.03, y + 0.06 - h * 0.9); x.stroke();
           if (stage >= 3) { x.fillStyle = '#f2d870'; x.beginPath(); x.ellipse(px - 0.02, y + 0.03 - h, 0.022, 0.045, -0.2, 0, 7); x.fill(); }
         }
+      }
+      // Einfriedung je Zeitalter: Flechtzaun, Holzzaun, Feldsteinmauer, Steinmauer mit Goldkappen
+      if (age === 0) {
+        x.strokeStyle = OUT; x.lineWidth = 0.09; x.strokeRect(0.06, 0.06, 2.88, 2.88);
+        x.strokeStyle = '#9a7a48'; x.lineWidth = 0.06; x.strokeRect(0.06, 0.06, 2.88, 2.88);
+        x.strokeStyle = 'rgba(60,40,20,0.5)'; x.lineWidth = 0.015;
+        for (let k = 0; k < 30; k++) { const t = k / 30 * 2.88 + 0.06; x.beginPath(); x.moveTo(t, 0.03); x.lineTo(t + 0.05, 0.09); x.moveTo(t, 2.91); x.lineTo(t + 0.05, 2.97); x.moveTo(0.03, t); x.lineTo(0.09, t + 0.05); x.moveTo(2.91, t); x.lineTo(2.97, t + 0.05); x.stroke(); }
+        x.fillStyle = col; x.fillRect(0.0, -0.05, 0.12, 0.1);
+        return;
+      }
+      if (age >= 2) {
+        for (const [ax, ay, bw, bh] of [[0.02, 0.02, 2.96, 0.1], [0.02, 2.88, 2.96, 0.1], [0.02, 0.02, 0.1, 2.96], [2.88, 0.02, 0.1, 2.96]]) {
+          x.fillStyle = OUT; x.fillRect(ax - 0.01, ay - 0.06, bw + 0.02, bh + 0.08);
+          x.fillStyle = '#a8a096'; x.fillRect(ax, ay - 0.05, bw, bh + 0.05);
+          x.fillStyle = 'rgba(60,55,50,0.4)';
+          for (let k = 0; k < (bw + bh) * 7; k++) x.fillRect(ax + hash(k, bw * 10 | 0) * bw, ay - 0.04 + hash(bh * 10 | 0, k) * bh, 0.06, 0.02);
+        }
+        if (age === 3) for (const [px, py] of [[0.07, 0.05], [2.93, 0.05], [0.07, 2.93], [2.93, 2.93]]) { x.fillStyle = OUT; x.beginPath(); x.arc(px, py - 0.05, 0.08, 0, 7); x.fill(); x.fillStyle = '#f2c53d'; x.beginPath(); x.arc(px, py - 0.05, 0.06, 0, 7); x.fill(); }
+        x.fillStyle = col; x.fillRect(1.4, -0.08, 0.2, 0.1);
+        return;
       }
       // Zaun in Spielerfarbe
       x.strokeStyle = OUT; x.lineWidth = 0.07; x.strokeRect(0.06, 0.06, 2.88, 2.88);

@@ -1,6 +1,6 @@
 // Claycrown 2.0: Computergegner
-import { UNITS, BUILDINGS, TECHS, MAX_POP } from './data.js?v=202';
-import { RES_KIND } from './world.js?v=202';
+import { UNITS, BUILDINGS, TECHS, MAX_POP } from './data.js?v=203';
+import { RES_KIND } from './world.js?v=203';
 
 const DIFF = {
   easy: { workers: 16, firstAttack: 900, wave: 4, waveGrow: 1, armyRatio: 0.5, think: 1.6, towers: 0, bastions: 0, fortress: false, kennel: false, monument: false, ageWorkers: [14, 18, 22], milStart: 16, gangUp: false },

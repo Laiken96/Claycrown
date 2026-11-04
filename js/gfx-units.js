@@ -1,6 +1,6 @@
 // Claycrown 2.0: Einheitengrafik. Alle Figuren schauen nach rechts, Ursprung an den Füßen, 1 = eine Kachel.
 // Die Figuren werden je Bild (Stehen, Laufen, Angriff, Arbeit) einmal gezeichnet und zwischengespeichert.
-import { shade, limb, blob, poly, OUT } from './gfx-util.js?v=202';
+import { shade, limb, blob, poly, OUT } from './gfx-util.js?v=203';
 
 const SKIN = '#e9b68c', HAIR = '#5a3a22', LEATHER = '#6e4527', WOOD = '#82562f', WOOD_D = '#563519';
 const STEEL = '#c3c9d2', BRONZE = '#c98f3c', CLOTH = '#a07a50', BOOT = '#3d2717';
