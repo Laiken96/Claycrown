@@ -1,5 +1,5 @@
 // Claycrown Service Worker: Offline Betrieb
-const CACHE = 'claycrown-v3';
+const CACHE = 'claycrown-v4';
 const FILES = [
   './', './index.html', './manifest.webmanifest', './css/style.css',
   './js/main.js', './js/data.js', './js/util.js', './js/world.js', './js/ai.js', './js/render.js', './js/input.js', './js/ui.js', './js/audio.js',

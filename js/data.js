@@ -54,9 +54,14 @@ export const UNITS = {
     ma: 0, pa: 20, cls: 'siege', r: 0.55, siege: true, bonus: { bld: 50 }, cost: { wood: 160, gold: 75 }, time: 25, age: 2,
     desc: 'Zerstört Gebäude. Greift keine Einheiten an.',
   },
+  treb: {
+    name: 'Tribok', icon: '☄️', hp: 150, atk: 2, range: 11, rof: 6.0, speed: 0.8, sight: 9,
+    ma: 0, pa: 8, cls: 'siege', r: 0.6, siege: true, proj: true, stone: true, bonus: { bld: 95 }, cost: { wood: 200, gold: 200 }, time: 35, age: 2,
+    desc: 'Schleudert Steine auf Gebäude aus großer Entfernung. Wehrlos gegen Einheiten.',
+  },
   golem: {
     name: 'Tonkoloss', icon: '🗿', hp: 320, atk: 16, range: 0, rof: 2.2, speed: 1.5, sight: 6,
-    ma: 3, pa: 4, cls: 'inf', r: 0.5, bonus: { bld: 10 }, cost: { food: 120, gold: 100, clay: 150 }, time: 28, age: 3,
+    ma: 3, pa: 4, cls: 'inf', r: 0.5, bonus: { bld: 10 }, cost: { food: 120, gold: 100, clay: 100 }, time: 28, age: 3,
     desc: 'Gebrannter Riese aus Lehm. Die Elite der Kronenzeit.',
   },
 };
@@ -111,7 +116,7 @@ export const BUILDINGS = {
   },
   workshop: {
     name: 'Werkstatt', icon: '🛠️', w: 3, h: 3, hp: 1100, cost: { wood: 200 }, time: 45, age: 2, req: 'forge',
-    trains: ['ram'], sight: 4, cat: 'mil', desc: 'Baut Rammböcke.',
+    trains: ['ram', 'treb'], sight: 4, cat: 'mil', desc: 'Baut Rammböcke und Triboks.',
   },
   monument: {
     name: 'Kronenmonument', icon: '👑', w: 5, h: 5, hp: 4000, ma: 3, pa: 10,
@@ -125,8 +130,8 @@ export const MIL_BUILD = ['barracks', 'range', 'stable', 'forge', 'tower', 'work
 
 export const TECHS = {
   age1: { name: 'Brennofenzeit', icon: '🏺', cost: { food: 500 }, time: 45, age: 0, ageUp: 1, desc: 'Zweites Zeitalter: Bogenschützen, Reiter, Schmiede, Türme.' },
-  age2: { name: 'Bronzezeit', icon: '🔔', cost: { food: 800, gold: 200 }, time: 60, age: 1, ageUp: 2, desc: 'Drittes Zeitalter: Rammböcke und Ziegelbau.' },
-  age3: { name: 'Kronenzeit', icon: '👑', cost: { food: 1000, gold: 600, clay: 300 }, time: 75, age: 2, ageUp: 3, desc: 'Viertes Zeitalter: Tonkoloss und Kronenmonument.' },
+  age2: { name: 'Bronzezeit', icon: '🔔', cost: { food: 800, gold: 200 }, time: 60, age: 1, ageUp: 2, desc: 'Drittes Zeitalter: Rammböcke, Triboks und Ziegelbau.' },
+  age3: { name: 'Kronenzeit', icon: '👑', cost: { food: 1000, gold: 600, clay: 200 }, time: 75, age: 2, ageUp: 3, desc: 'Viertes Zeitalter: Tonkoloss und Kronenmonument.' },
   wheelbarrow: { name: 'Schubkarre', icon: '🛒', cost: { food: 150, wood: 50 }, time: 30, age: 1, desc: 'Arbeiter tragen 5 mehr und laufen 10 % schneller.' },
   axe: { name: 'Doppelaxt', icon: '🪓', cost: { food: 100, wood: 50 }, time: 25, age: 0, desc: 'Holzfällen 20 % schneller.' },
   plow: { name: 'Schwerer Pflug', icon: '🐂', cost: { food: 125, wood: 100 }, time: 30, age: 1, desc: 'Feldarbeit 20 % schneller.' },

@@ -6,7 +6,7 @@ import { RNG, Heap, valueNoise, clamp } from './util.js';
 
 export const T = { GRASS: 0, WATER: 1, SHALLOW: 2, SAND: 3, DIRT: 4 };
 export const RES_KIND = { tree: 'wood', gold: 'gold', clay: 'clay', berry: 'food' };
-const RES_AMOUNT = { tree: 100, gold: 800, clay: 600, berry: 125 };
+const RES_AMOUNT = { tree: 100, gold: 800, clay: 800, berry: 125 };
 const BASE_RATE = { tree: 0.48, gold: 0.40, clay: 0.44, berry: 0.50, farm: 0.44 };
 const DX = [1, -1, 0, 0, 1, 1, -1, -1];
 const DY = [0, 0, 1, -1, 1, -1, 1, -1];
@@ -203,7 +203,8 @@ export class Game {
       ['worker', 'worker', 'worker', 'spear'].forEach((t, k) => this.addUnit(t, pid, dirs[k][0] + 0.5, dirs[k][1] + 0.5));
       this.placeCluster(rng, 'berry', 6, s, 5, 7);
       this.placeCluster(rng, 'gold', 5, s, 8, 10);
-      this.placeCluster(rng, 'clay', 5, s, 8, 11);
+      this.placeCluster(rng, 'clay', 6, s, 8, 11);
+      this.placeCluster(rng, 'clay', 5, s, 15, 19);
       this.placeCluster(rng, 'gold', 4, s, 15, 19);
       this.placeCluster(rng, 'tree', 26, s, 9, 12);
       this.placeCluster(rng, 'tree', 14, s, 10, 14);
@@ -214,7 +215,7 @@ export class Game {
       for (let tries = 0; tries < 30; tries++) {
         const x = rng.int(4, W - 5), y = rng.int(4, H - 5);
         if (dmin(x, y) < 20 || !this.buildableTile(x, y)) continue;
-        this.placeCluster(rng, k % 3 === 2 ? 'clay' : 'gold', rng.int(4, 6), { x, y }, 0, 0);
+        this.placeCluster(rng, k % 2 === 1 ? 'clay' : 'gold', rng.int(4, 6), { x, y }, 0, 0);
         break;
       }
     }
@@ -718,7 +719,7 @@ export class Game {
   attackRange(u) {
     const d = UNITS[u.type];
     if (!d.range) return 0.3;
-    return d.range + (this.players[u.owner].techs.arrows ? 1 : 0);
+    return d.range + (d.cls === 'arch' && this.players[u.owner].techs.arrows ? 1 : 0);
   }
 
   calcDamage(att, tgt, pierce) {
@@ -727,7 +728,7 @@ export class Game {
     let a = ad.atk;
     if (att.cls === 'u') {
       if (!ad.proj && ad.cls !== 'worker' && ad.cls !== 'siege' && p.techs.blades) a += 2;
-      if (ad.proj && p.techs.arrows) a += 1;
+      if (ad.proj && ad.cls === 'arch' && p.techs.arrows) a += 1;
     } else if (p.techs.arrows) a += 1;
     const tc = tgt.cls === 'u' ? UNITS[tgt.type].cls : 'bld';
     if (ad.bonus && ad.bonus[tc]) a += ad.bonus[tc];
@@ -753,7 +754,8 @@ export class Game {
     const sy = src.cls === 'b' ? src.y - 1.2 : src.y - 0.2;
     this.projectiles.push({
       x: src.x, y: sy, sx: src.x, sy, tid: tgt.id, dmg: this.calcDamage(src, tgt, true), owner: src.owner, aid: src.id,
-      spd: 10, d0: Math.max(0.5, Math.hypot(tgt.x - src.x, tgt.y - sy)),
+      spd: src.cls === 'u' && UNITS[src.type].stone ? 7 : 10, d0: Math.max(0.5, Math.hypot(tgt.x - src.x, tgt.y - sy)),
+      stone: src.cls === 'u' && !!UNITS[src.type].stone,
     });
     if (src.owner === 0 || this.vis[Math.floor(src.y) * this.W + Math.floor(src.x)] === 2) this.emit({ type: 'shoot', x: src.x, y: src.y });
   }

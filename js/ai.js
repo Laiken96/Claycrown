@@ -11,8 +11,8 @@ const DIFF = {
 const RATIOS = [
   { food: 0.52, wood: 0.45, gold: 0.0, clay: 0.03 },
   { food: 0.4, wood: 0.4, gold: 0.16, clay: 0.04 },
-  { food: 0.36, wood: 0.34, gold: 0.24, clay: 0.06 },
-  { food: 0.34, wood: 0.3, gold: 0.26, clay: 0.1 },
+  { food: 0.36, wood: 0.33, gold: 0.27, clay: 0.04 },
+  { food: 0.34, wood: 0.29, gold: 0.30, clay: 0.07 },
 ];
 
 export class AI {
@@ -353,7 +353,7 @@ export class AI {
   // ---------- Militär ----------
   trainArmy(blds) {
     const g = this.g, p = this.p;
-    const rams = [...g.ents.values()].filter(e => e.cls === 'u' && e.owner === this.pid && e.type === 'ram').length;
+    const rams = [...g.ents.values()].filter(e => e.cls === 'u' && e.owner === this.pid && UNITS[e.type].siege).length;
     for (const b of blds) {
       if (!b.done || b.queue.length >= 2) continue;
       const trains = (BUILDINGS[b.type].trains || []).filter(k => k !== 'worker' && UNITS[k].age <= p.age);
@@ -365,7 +365,7 @@ export class AI {
         else pick = 'spear';
         if (!trains.includes(pick)) pick = trains[0];
       } else pick = trains[Math.floor(Math.random() * trains.length)];
-      if (pick === 'ram' && rams >= 3) continue;
+      if (UNITS[pick].siege && rams >= 4) continue;
       if (!this.s.threatNow && this.armySize >= Math.max(6, this.workers * this.cfg.armyRatio)) return;
       if (p.pop >= p.popCap) return;
       const cost = UNITS[pick].cost;

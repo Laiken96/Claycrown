@@ -9,7 +9,7 @@ Optimiert für iPhone und iPad (Safari, Home-Bildschirm im Vollbild), läuft ebe
 * 4 Rohstoffe: Nahrung, Holz, Gold, Lehm
 * 4 Zeitalter: Lehmzeit, Brennofenzeit, Bronzezeit, Kronenzeit
 * 13 Gebäude, darunter Burg, Kaserne, Schießstand, Stall, Schmiede, Wachturm, Werkstatt und Kronenmonument
-* 7 Einheiten mit Stärken und Schwächen: Arbeiter, Speerträger, Schwertkämpfer, Bogenschütze, Reiter, Rammbock, Tonkoloss
+* 8 Einheiten mit Stärken und Schwächen: Arbeiter, Speerträger, Schwertkämpfer, Bogenschütze, Reiter, Rammbock, Tribok, Tonkoloss
 * 11 Technologien inklusive Zeitalteraufstieg
 * 1 bis 3 KI Gegner in drei Schwierigkeitsstufen, zufällige Karten in drei Größen
 * Nebel des Krieges für alle Seiten: Die KI muss erkunden und sieht nur auf Schwer die ganze Karte

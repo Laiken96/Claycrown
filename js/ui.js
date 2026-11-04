@@ -209,6 +209,21 @@ export class UI {
       if (units.some(u => u.type !== 'worker')) {
         list.push({ key: 'amove', icon: '🗡️', label: 'Angriff', active: app.mode && app.mode.k === 'amove', hint: 'Angriffsbewegung: Ziel antippen. Einheiten kämpfen unterwegs gegen alles.', run: () => app.setMode({ k: 'amove' }) });
       }
+      if (workers) {
+        const ws = units.filter(u => u.type === 'worker');
+        list.push({ key: 'drop', icon: '📦', label: 'Abliefern', hint: 'Abliefern: Arbeiter bringen ihre Last zum nächsten Lager und arbeiten danach weiter.', run: () => {
+          let n = 0;
+          for (const w of ws) {
+            if (w.carryN < 1) continue;
+            n++;
+            if (w.order && w.order.t === 'gather') w.order.dropping = true;
+            else w.order = { t: 'gather', id: 0, kind: w.carry, dropping: true };
+            w.path = null;
+          }
+          if (n) app.sound.play('command'); else this.toast('Niemand trägt etwas');
+        } });
+        list.push({ key: 'repair', icon: '🔧', label: 'Reparieren', active: app.mode && app.mode.k === 'repair', hint: 'Reparieren: Danach ein beschädigtes eigenes Gebäude antippen.', run: () => app.setMode({ k: 'repair' }) });
+      }
       list.push({ key: 'stop', icon: '✋', label: 'Halt', run: () => { g.issueStop(units.map(u => u.id)); app.sound.play('command'); } });
       return list;
     }

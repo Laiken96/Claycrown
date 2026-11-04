@@ -2,7 +2,7 @@
 import { SIM_DT, UNITS, BUILDINGS, AGES } from './data.js';
 import { Game } from './world.js';
 import { AI } from './ai.js';
-import { Renderer } from './render.js';
+import { Renderer, BUILD_TOP } from './render.js';
 import { Input } from './input.js';
 import { UI } from './ui.js';
 import { Sound } from './audio.js';
@@ -257,22 +257,35 @@ class App {
   pick(sx, sy, touch) {
     const g = this.g, [wx, wy] = this.r.toWorld(sx, sy), s = this.r.scale;
     const tol = (touch ? 16 : 5) / s;
-    let best = null, bd = 1e9;
-    for (const e of g.ents.values()) {
-      if (e.cls !== 'u') continue;
-      if (Math.abs(e.x - wx) > 2 || Math.abs(e.y - wy) > 2) continue;
-      if (!g.isVisible(e)) continue;
-      const r = UNITS[e.type].r;
-      const d = Math.min(Math.hypot(e.x - wx, e.y - r - wy), Math.hypot(e.x - wx, e.y - wy));
-      if (d < r + 0.15 + tol && d < bd) { bd = d; best = e; }
-    }
-    if (best) return best;
-    const tx = Math.floor(wx), ty = Math.floor(wy);
-    // Gebäude (inklusive Dachbereich)
+    const unitAt = extra => {
+      let best = null, bd = 1e9;
+      for (const e of g.ents.values()) {
+        if (e.cls !== 'u') continue;
+        if (Math.abs(e.x - wx) > 2 || Math.abs(e.y - wy) > 2) continue;
+        if (!g.isVisible(e)) continue;
+        const r = UNITS[e.type].r;
+        const d = Math.min(Math.hypot(e.x - wx, e.y - r - wy), Math.hypot(e.x - wx, e.y - wy));
+        if (d < r + extra && d < bd) { bd = d; best = e; }
+      }
+      return best;
+    };
+    // 1. Einheit genau getroffen
+    let u = unitAt(0.08);
+    if (u) return u;
+    // 2. Gebäude über die ganze sichtbare Fläche samt Dach, das vorderste gewinnt
+    let bb = null;
     for (const e of g.ents.values()) {
       if (e.cls !== 'b' || !g.isVisible(e)) continue;
-      if (wx >= e.tx - tol && wx <= e.tx + e.w + tol && wy >= e.ty - 0.7 - tol && wy <= e.ty + e.h + tol) return e;
+      const top = (e.done || e.prog > 0.3 ? BUILD_TOP[e.type] || 0 : 0.3) * 0.95;
+      if (wx >= e.tx - tol * 0.6 && wx <= e.tx + e.w + tol * 0.6 && wy >= e.ty - top - tol * 0.6 && wy <= e.ty + e.h + tol * 0.6) {
+        if (!bb || e.ty + e.h > bb.ty + bb.h) bb = e;
+      }
     }
+    if (bb) return bb;
+    // 3. Einheit mit Toleranz
+    u = unitAt(0.15 + tol);
+    if (u) return u;
+    const tx = Math.floor(wx), ty = Math.floor(wy);
     for (const [ox, oy] of [[0, 0], [0, 1], [0, -1], [1, 0], [-1, 0]]) {
       const e = g.entAt(tx + ox, ty + oy);
       if (e && e.cls === 'r' && g.isVisible(e)) {
@@ -318,7 +331,7 @@ class App {
     const mine = this.myUnitsSel();
     if (t && t.owner === 0) {
       const workers = mine.some(u => u.type === 'worker');
-      if (mine.length && t.cls === 'b' && !this.sel.has(t.id) && workers && (!t.done || t.type === 'farm' || t.hp < t.maxHp || (BUILDINGS[t.type].drop && mine.some(u => u.carryN > 0)))) {
+      if (mine.length && t.cls === 'b' && !this.sel.has(t.id) && workers && !t.done) {
         this.command(t, wx, wy); return;
       }
       this.selectEnt(t, dbl, false);
@@ -357,6 +370,14 @@ class App {
       const t = this.pick(sx, sy, true);
       for (const b of this.selEnts()) if (b.cls === 'b' && b.owner === 0) this.g.setRally(b.id, wx, wy, t && t.id);
       this.r.addMarker(wx, wy, '#ffffff'); this.sound.play('command'); this.setMode(null); return true;
+    }
+    if (m.k === 'repair') {
+      const t = this.pick(sx, sy, true);
+      const ids = this.myUnitsSel().filter(u => u.type === 'worker').map(u => u.id);
+      if (t && t.cls === 'b' && t.owner === 0 && (!t.done || t.hp < t.maxHp)) {
+        this.g.issueBuild(ids, t.id); this.r.addMarker(t.x, t.y, '#ffe680'); this.sound.play('command');
+      } else { this.ui.toast('Kein beschädigtes eigenes Gebäude', 'warn'); this.sound.play('error'); }
+      this.setMode(null); return true;
     }
     if (m.k === 'amove') {
       const t = this.pick(sx, sy, true);
@@ -465,6 +486,7 @@ class App {
     if (m.k === 'place') label = `${BUILDINGS[m.type].icon} ${BUILDINGS[m.type].name}: ${m.mouse ? 'Klicken zum Bauen' : 'Vorschau ziehen oder tippen, dann ✓'}`;
     else if (m.k === 'rally') label = '🚩 Sammelpunkt antippen';
     else if (m.k === 'amove') label = '🗡️ Angriffsziel antippen';
+    else if (m.k === 'repair') label = '🔧 Beschädigtes Gebäude antippen';
     $('mode-label').textContent = label;
     if (this.ui) this.ui.t = 0;
   }

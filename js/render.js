@@ -155,7 +155,7 @@ const BUILD_DRAW = {
     door(c, 2.2, 4.8, 0.6, 0.4);
   },
 };
-const BUILD_TOP = { keep: 2.3, house: 1.1, mill: 1.3, lumber: 1.0, mine: 1.0, barracks: 1.3, range: 1.2, stable: 1.2, forge: 1.7, tower: 3.4, workshop: 1.4, monument: 2.2, farm: 0 };
+export const BUILD_TOP = { keep: 2.3, house: 1.1, mill: 1.3, lumber: 1.0, mine: 1.0, barracks: 1.3, range: 1.2, stable: 1.2, forge: 1.7, tower: 3.4, workshop: 1.4, monument: 2.2, farm: 0 };
 
 export class Renderer {
   constructor(canvas, minimap) {
@@ -550,6 +550,20 @@ export class Renderer {
       c.fillStyle = '#3a2210'; c.fillRect(face * 0.25 - 0.04, -0.36, 0.08, 0.14);
       this.body(c, 0, -0.42, 0.17, col, face);
       c.strokeStyle = '#ddd'; c.lineWidth = 0.05; c.beginPath(); c.moveTo(face * 0.05, -0.5); c.lineTo(face * (0.45 + swing * 0.1), -0.75 + swing * 0.2); c.stroke();
+    } else if (u.type === 'treb') {
+      const f = Math.cos(u.dir) >= 0 ? 1 : -1;
+      c.fillStyle = WOOD_D; c.fillRect(-0.55, -0.12, 1.1, 0.2);
+      c.fillStyle = '#222'; for (const wx of [-0.42, 0.42]) { c.beginPath(); c.arc(wx, 0.1, 0.11, 0, 7); c.fill(); }
+      c.strokeStyle = WOOD; c.lineWidth = 0.09;
+      c.beginPath(); c.moveTo(-0.3, -0.1); c.lineTo(0, -0.75); c.lineTo(0.3, -0.1); c.stroke();
+      // Wurfarm schwingt beim Schuss
+      const k = u.atkT > 0 ? Math.min(1, (0.35 - u.atkT) / 0.35) : 0;
+      const a = (-0.5 - k * 2.2) * f + (f < 0 ? Math.PI : 0);
+      c.strokeStyle = '#6b4a2b'; c.lineWidth = 0.07;
+      c.beginPath(); c.moveTo(0, -0.75); c.lineTo(Math.cos(a) * 0.75, -0.75 + Math.sin(a) * 0.75); c.stroke();
+      c.beginPath(); c.moveTo(0, -0.75); c.lineTo(-Math.cos(a) * 0.3, -0.75 - Math.sin(a) * 0.3); c.stroke();
+      c.fillStyle = '#5a5550'; c.fillRect(-Math.cos(a) * 0.3 - 0.12, -0.75 - Math.sin(a) * 0.3 - 0.05, 0.24, 0.2);
+      c.fillStyle = col; c.fillRect(-0.55, -0.16, 1.1, 0.06);
     } else if (u.type === 'ram') {
       c.save(); c.rotate(Math.cos(u.dir) >= 0 ? 0 : Math.PI);
       c.fillStyle = WOOD_D; c.fillRect(-0.5, -0.2, 1.0, 0.36);
@@ -637,6 +651,14 @@ export class Renderer {
       const total = p.d0, done = Math.hypot(p.x - p.sx, p.y - p.sy), k = Math.min(1, done / total);
       const arc = Math.sin(k * Math.PI) * Math.min(1.2, total * 0.12);
       const [sx, sy] = this.toScreen(p.x, p.y - arc);
+      if (p.stone) {
+        const [gx, gy] = this.toScreen(p.x, p.y);
+        c.fillStyle = 'rgba(0,0,0,0.25)'; c.beginPath(); c.ellipse(gx, gy, s * 0.15, s * 0.07, 0, 0, 7); c.fill();
+        const [hx, hy] = this.toScreen(p.x, p.y - Math.sin(k * Math.PI) * Math.min(3, total * 0.3));
+        c.fillStyle = '#7a756c'; c.beginPath(); c.arc(hx, hy, s * 0.16, 0, 7); c.fill();
+        c.fillStyle = '#a9a398'; c.beginPath(); c.arc(hx - s * 0.05, hy - s * 0.05, s * 0.07, 0, 7); c.fill();
+        continue;
+      }
       const dir = p.dir || 0, l = s * 0.35;
       c.beginPath(); c.moveTo(sx - Math.cos(dir) * l / 2, sy - Math.sin(dir) * l / 2 + (k < 0.5 ? l * 0.2 : -l * 0.2)); c.lineTo(sx + Math.cos(dir) * l / 2, sy + Math.sin(dir) * l / 2); c.stroke();
     }
