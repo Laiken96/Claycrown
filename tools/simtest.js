@@ -5,7 +5,7 @@ import { SIM_DT } from '../js/data.js';
 
 const minutes = Number(process.argv[2] || 25);
 const diff = process.argv[3] || 'normal';
-const g = Game.create({ size: 96, ais: 1, difficulty: diff, seed: Number(process.argv[4] || 12345) });
+const g = Game.create({ size: Number(process.argv[5] || 96), ais: Number(process.argv[6] || 1), difficulty: diff, seed: Number(process.argv[4] || 12345) });
 g.players[0].ai = {};
 const ais = g.players.map((p, i) => new AI(g, i));
 const t0 = Date.now();

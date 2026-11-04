@@ -55,6 +55,7 @@ export class Sound {
       case 'win': [523, 659, 784, 1046, 1318].forEach((f, i) => this.tone(f, 0.5, 'triangle', 0.3, 0, i * 0.15)); break;
       case 'lose': [440, 392, 330, 262].forEach((f, i) => this.tone(f, 0.5, 'sawtooth', 0.15, 0, i * 0.22)); break;
       case 'destroyed': this.noise(0.5, 0.5, 300); break;
+      case 'trade': this.tone(1200, 0.06, 'triangle', 0.2); this.tone(1600, 0.09, 'triangle', 0.18, 0, 0.06); break;
     }
   }
 }

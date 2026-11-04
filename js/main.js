@@ -1,5 +1,5 @@
-// Claycrown: Start, Spielschleife und Steuerung
-import { SIM_DT, UNITS, BUILDINGS, AGES } from './data.js';
+// Claycrown 2.0: Start, Spielschleife und Steuerung
+import { SIM_DT, UNITS, BUILDINGS, AGES, VERSION } from './data.js';
 import { Game } from './world.js';
 import { AI } from './ai.js';
 import { Renderer, BUILD_TOP } from './render.js';
@@ -8,8 +8,8 @@ import { UI } from './ui.js';
 import { Sound } from './audio.js';
 
 const $ = id => document.getElementById(id);
-const SAVE_KEY = 'claycrown.save.v1';
-const SET_KEY = 'claycrown.settings.v1';
+const SAVE_KEY = 'claycrown.save.v2';
+const SET_KEY = 'claycrown.settings.v2';
 
 class App {
   constructor() {
@@ -24,7 +24,10 @@ class App {
     this.hint = ''; this.hintT = 0;
     this.edgeScroll = false;
     this.opts = { ais: 1, difficulty: 'normal', size: 96 };
+    this.gfx = { quality: this.defaultQuality(), dayNight: true };
     this.loadSettings();
+    this.r.dayNight = this.gfx.dayNight;
+    this.r.setQuality(this.gfx.quality);
     this.input = new Input($('view'), $('minimap'), this);
     this.bindMenus();
     this.onResize();
@@ -45,9 +48,24 @@ class App {
       Object.assign(this.opts, s.opts || {});
       if (s.sound === false) this.sound.on = false;
       if (s.speed) this.speed = s.speed;
+      if (s.gfx) Object.assign(this.gfx, s.gfx);
     } catch (e) { /* ignorieren */ }
   }
-  saveSettings() { try { localStorage.setItem(SET_KEY, JSON.stringify({ opts: this.opts, sound: this.sound.on, speed: this.speed })); } catch (e) { /* ignorieren */ } }
+  saveSettings() { try { localStorage.setItem(SET_KEY, JSON.stringify({ opts: this.opts, sound: this.sound.on, speed: this.speed, gfx: this.gfx })); } catch (e) { /* ignorieren */ } }
+  // Ältere oder schwache Geräte starten mit mittlerer Qualität
+  defaultQuality() {
+    const cores = navigator.hardwareConcurrency || 4, mem = navigator.deviceMemory || 4;
+    return cores <= 4 || mem <= 2 ? 'mid' : 'high';
+  }
+  applyGfx() {
+    this.r.dayNight = this.gfx.dayNight;
+    if (this.r.qName !== this.gfx.quality) this.r.setQuality(this.gfx.quality);
+    this.onResize();
+    document.querySelectorAll('.seg[data-gfx]').forEach(seg => {
+      const k = seg.dataset.gfx;
+      seg.querySelectorAll('button').forEach(b => b.classList.toggle('on', String(this.gfx[k]) === b.dataset.v));
+    });
+  }
   hasSave() { try { return !!localStorage.getItem(SAVE_KEY); } catch (e) { return false; } }
   autoSave(silent) {
     if (!this.g || this.g.over) return;
@@ -72,6 +90,17 @@ class App {
         });
       });
     });
+    document.querySelectorAll('.seg[data-gfx]').forEach(seg => {
+      const k = seg.dataset.gfx;
+      seg.querySelectorAll('button').forEach(b => {
+        b.addEventListener('click', () => {
+          this.gfx[k] = k === 'dayNight' ? b.dataset.v === 'true' : b.dataset.v;
+          this.saveSettings(); this.applyGfx();
+        });
+      });
+    });
+    this.applyGfx();
+    $('version').textContent = 'Version ' + VERSION;
     const sp = $('speed-seg');
     sp.querySelectorAll('button').forEach(b => {
       b.classList.toggle('on', Number(b.dataset.v) === this.speed);
@@ -154,7 +183,7 @@ class App {
     this.g = g;
     this.ais = g.players.filter(p => p.isAI).map(p => new AI(g, p.id));
     this.r.setGame(g);
-    this.r.cam.zoom = Math.min(window.innerWidth, window.innerHeight) < 500 ? 0.72 : 1.0;
+    this.r.cam.zoom = Math.min(window.innerWidth, window.innerHeight) < 500 ? 0.8 : 1.05;
     this.ui = this.ui || new UI(this);
     this.ui.cmdSig = ''; this.ui.selSig = ''; this.ui.last = {};
     this.sel.clear(); this.mode = null; this.box = null; this.acc = 0;
@@ -199,7 +228,7 @@ class App {
     if (this.hintT > 0) { this.hintT -= dt; if (this.hintT <= 0) this.hint = ''; }
     const ghost = this.mode && this.mode.k === 'place' ? { type: this.mode.type, tx: this.mode.tx, ty: this.mode.ty, touch: !this.mode.mouse } : null;
     const rallyOf = [...this.sel].map(id => this.g.ents.get(id)).find(e => e && e.cls === 'b' && e.owner === 0 && e.rally);
-    this.r.draw(this.paused ? 1 : Math.min(1, this.acc / SIM_DT), { selSet: this.sel, ghost, box: this.box, rallyOf: rallyOf && rallyOf.id });
+    this.r.draw(this.paused ? 1 : Math.min(1, this.acc / SIM_DT), { selSet: this.sel, ghost, box: this.box, rallyOf: rallyOf && rallyOf.id }, this.paused || this.g.over ? 0 : dt * this.speed);
     this.r.drawMinimap();
     this.ui.update(dt);
   }
@@ -208,6 +237,7 @@ class App {
     const g = this.g, ev = g.events;
     if (!ev.length) return;
     for (const e of ev) {
+      this.r.onEvent(e);
       switch (e.type) {
         case 'attacked':
           this.sound.play('alarm'); this.ui.toast('⚠ Du wirst angegriffen!', 'warn');
@@ -472,6 +502,13 @@ class App {
     if (typeof r === 'string') { this.sound.play('error'); this.ui.toast(r, 'warn'); if (r.startsWith('Nicht genug')) this.ui.flashRes(r.slice(12)); return; }
     this.sound.play('place');
     if (navigator.vibrate) navigator.vibrate(10);
+    if (m.type === 'wall' && !this.g.buildError(0, m.type)) {
+      // nächstes Mauerstück in derselben Richtung vorschlagen
+      const dx = m.last ? Math.sign(m.tx - m.last.tx) : 1, dy = m.last ? Math.sign(m.ty - m.last.ty) : 0;
+      m.last = { tx: m.tx, ty: m.ty };
+      if (!m.mouse) { m.tx += dx || (dy ? 0 : 1); m.ty += dy; }
+      return;
+    }
     if (keep && !this.g.buildError(0, m.type)) return;
     this.setMode(null);
   }
@@ -483,7 +520,7 @@ class App {
     bar.classList.remove('hidden');
     $('mode-ok').classList.toggle('hidden', m.k !== 'place');
     let label = '';
-    if (m.k === 'place') label = `${BUILDINGS[m.type].icon} ${BUILDINGS[m.type].name}: ${m.mouse ? 'Klicken zum Bauen' : 'Vorschau ziehen oder tippen, dann ✓'}`;
+    if (m.k === 'place') label = `${BUILDINGS[m.type].icon} ${BUILDINGS[m.type].name}: ${m.mouse ? (m.type === 'wall' ? 'Klicken setzt Mauerstücke, Rechtsklick beendet' : 'Klicken zum Bauen') : (m.type === 'wall' ? 'Stück setzen mit ✓, beenden mit ✕' : 'Vorschau ziehen oder tippen, dann ✓')}`;
     else if (m.k === 'rally') label = '🚩 Sammelpunkt antippen';
     else if (m.k === 'amove') label = '🗡️ Angriffsziel antippen';
     else if (m.k === 'repair') label = '🔧 Beschädigtes Gebäude antippen';
@@ -501,6 +538,12 @@ class App {
     const r = this.g.train(bs[0].id, key);
     if (r !== true) { this.sound.play('error'); this.ui.toast(r, 'warn'); if (r.startsWith('Nicht genug')) this.ui.flashRes(r.slice(12)); }
     else { this.sound.play('select'); this.ui.selSig = ''; }
+  }
+
+  trade(kind, buy) {
+    const r = this.g.trade(0, kind, buy);
+    if (r !== true) { this.sound.play('error'); this.ui.toast(r, 'warn'); if (r.startsWith('Nicht genug')) this.ui.flashRes(r.slice(12)); }
+    else { this.sound.play('trade'); this.ui.cmdSig = ''; }
   }
 
   researchSel(key) {

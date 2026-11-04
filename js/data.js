@@ -1,7 +1,8 @@
-// Claycrown: Spieldaten (Einheiten, Gebäude, Technologien, Zeitalter)
+// Claycrown 2.0: Spieldaten (Einheiten, Gebäude, Technologien, Zeitalter)
 
 export const SIM_DT = 0.05;          // feste Simulationsschrittweite in Sekunden
-export const MAX_POP = 125;
+export const MAX_POP = 150;
+export const VERSION = '2.0';
 export const MONUMENT_TIME = 180;    // Sekunden bis zum Monumentsieg
 export const RES = ['food', 'wood', 'gold', 'clay'];
 
@@ -41,7 +42,7 @@ export const UNITS = {
   },
   archer: {
     name: 'Bogenschütze', icon: '🏹', hp: 35, atk: 4, range: 5, rof: 2.0, speed: 1.9, sight: 7,
-    ma: 0, pa: 0, cls: 'arch', r: 0.28, proj: true, bonus: { inf: 2 }, cost: { wood: 25, gold: 40 }, time: 13, age: 1,
+    ma: 0, pa: 0, cls: 'arch', r: 0.28, proj: true, bow: true, bonus: { inf: 2 }, cost: { wood: 25, gold: 40 }, time: 13, age: 1,
     desc: 'Fernkampf. Stark gegen Infanterie.',
   },
   rider: {
@@ -63,6 +64,41 @@ export const UNITS = {
     name: 'Priester', icon: '🙏', hp: 30, atk: 0, range: 0, rof: 1, speed: 1.7, sight: 7,
     ma: 0, pa: 0, cls: 'priest', r: 0.28, heal: 2.5, healRange: 4, cost: { gold: 100 }, time: 25, age: 1,
     desc: 'Heilt verletzte eigene Einheiten und Arbeiter in der Nähe. Kämpft nicht.',
+  },
+  skirm: {
+    name: 'Plänkler', icon: '🪃', hp: 38, atk: 3, range: 4, rof: 2.0, speed: 2.0, sight: 6,
+    ma: 0, pa: 3, cls: 'arch', r: 0.28, proj: true, javelin: true, bonus: { arch: 5, cav: 1 }, cost: { food: 30, wood: 30 }, time: 12, age: 1,
+    desc: 'Speerwerfer mit Schild. Billig und stark gegen Bogenschützen.',
+  },
+  crossbow: {
+    name: 'Armbrustschütze', icon: '🎯', hp: 45, atk: 7, range: 6, rof: 2.4, speed: 1.8, sight: 8,
+    ma: 1, pa: 1, cls: 'arch', r: 0.29, proj: true, bow: true, bolt: true, bonus: { inf: 3, cav: 1 }, cost: { wood: 35, gold: 55 }, time: 15, age: 2,
+    desc: 'Durchschlagskräftiger Fernkämpfer der Bronzezeit.',
+  },
+  horsearcher: {
+    name: 'Reiterschütze', icon: '🏇', hp: 75, atk: 5, range: 4, rof: 2.1, speed: 3.0, sight: 8,
+    ma: 0, pa: 2, cls: 'cav', r: 0.42, proj: true, bow: true, mounted: true, bonus: { inf: 1 }, cost: { food: 50, gold: 80 }, time: 18, age: 2,
+    desc: 'Schneller berittener Bogenschütze. Ideal für Überfälle.',
+  },
+  knight: {
+    name: 'Ritter', icon: '⚜️', hp: 170, atk: 12, range: 0, rof: 1.9, speed: 2.7, sight: 6,
+    ma: 2, pa: 3, cls: 'cav', r: 0.44, mounted: true, bonus: { arch: 4, siege: 10 }, cost: { food: 80, gold: 110 }, time: 22, age: 2,
+    desc: 'Schwer gepanzerter Reiter. Zerschmettert Fernkämpfer und Belagerung.',
+  },
+  dog: {
+    name: 'Kriegshund', icon: '🐕', hp: 40, atk: 4, range: 0, rof: 1.0, speed: 3.6, sight: 8,
+    ma: 0, pa: 1, cls: 'cav', r: 0.26, beast: true, bonus: { arch: 3, worker: 3 }, cost: { food: 40 }, time: 9, age: 0,
+    desc: 'Flink und billig. Ideal zum Erkunden und um Arbeiter zu jagen.',
+  },
+  ballista: {
+    name: 'Balliste', icon: '🗜️', hp: 110, atk: 10, range: 9, rof: 3.4, speed: 1.0, sight: 10,
+    ma: 0, pa: 6, cls: 'siege', r: 0.5, proj: true, bolt: true, bonus: { siege: 25, cav: 6, bld: 6 }, cost: { wood: 140, gold: 90 }, time: 26, age: 2,
+    desc: 'Schweres Pfeilgeschütz. Trifft Einheiten aus großer Entfernung und zerlegt Belagerungsgerät.',
+  },
+  guard: {
+    name: 'Kronwächter', icon: '💂', hp: 150, atk: 13, range: 0, rof: 1.7, speed: 1.9, sight: 6,
+    ma: 3, pa: 3, cls: 'inf', r: 0.33, bonus: { inf: 3, bld: 4 }, cost: { food: 90, gold: 75 }, time: 20, age: 2,
+    desc: 'Elitegarde der Festung. Schwer gerüstet und stark gegen Infanterie.',
   },
   golem: {
     name: 'Tonkoloss', icon: '🗿', hp: 320, atk: 16, range: 0, rof: 2.2, speed: 1.5, sight: 6,
@@ -104,16 +140,16 @@ export const BUILDINGS = {
     trains: ['spear', 'sword', 'golem'], sight: 4, cat: 'mil', desc: 'Bildet Infanterie aus.',
   },
   range: {
-    name: 'Schießstand', icon: '🎯', w: 3, h: 3, hp: 1100, cost: { wood: 175 }, time: 40, age: 1, req: 'barracks',
-    trains: ['archer'], sight: 4, cat: 'mil', desc: 'Bildet Bogenschützen aus.',
+    name: 'Schießstand', icon: '⛺', w: 3, h: 3, hp: 1100, cost: { wood: 175 }, time: 40, age: 1, req: 'barracks',
+    trains: ['archer', 'skirm', 'crossbow'], techs: ['thumbring'], sight: 4, cat: 'mil', desc: 'Bildet Bogenschützen, Plänkler und Armbrustschützen aus.',
   },
   stable: {
     name: 'Stall', icon: '🐴', w: 3, h: 3, hp: 1100, cost: { wood: 175 }, time: 40, age: 1, req: 'barracks',
-    trains: ['rider'], sight: 4, cat: 'mil', desc: 'Bildet Reiter aus.',
+    trains: ['rider', 'horsearcher', 'knight'], techs: ['husbandry'], sight: 4, cat: 'mil', desc: 'Bildet Reiter, Reiterschützen und Ritter aus.',
   },
   forge: {
     name: 'Schmiede', icon: '🔨', w: 3, h: 3, hp: 1000, cost: { wood: 150 }, time: 40, age: 1,
-    techs: ['blades', 'arrows', 'armor'], sight: 4, cat: 'mil', desc: 'Erforscht Waffen und Rüstungen.',
+    techs: ['blades', 'arrows', 'armor', 'steel', 'plate'], sight: 4, cat: 'mil', desc: 'Erforscht Waffen und Rüstungen.',
   },
   temple: {
     name: 'Tempel', icon: '⛪', w: 3, h: 3, hp: 1200, cost: { wood: 175, clay: 75 }, time: 45, age: 1,
@@ -125,7 +161,33 @@ export const BUILDINGS = {
   },
   workshop: {
     name: 'Werkstatt', icon: '🛠️', w: 3, h: 3, hp: 1100, cost: { wood: 200 }, time: 45, age: 2, req: 'forge',
-    trains: ['ram', 'treb'], sight: 4, cat: 'mil', desc: 'Baut Rammböcke und Triboks.',
+    trains: ['ram', 'treb', 'ballista'], sight: 4, cat: 'mil', desc: 'Baut Rammböcke, Triboks und Ballisten.',
+  },
+  kennel: {
+    name: 'Zwinger', icon: '🦴', w: 2, h: 2, hp: 700, cost: { wood: 90 }, time: 26, age: 0,
+    trains: ['dog'], sight: 5, cat: 'mil', desc: 'Züchtet Kriegshunde.',
+  },
+  fortress: {
+    name: 'Festung', icon: '🏯', w: 4, h: 4, hp: 3200, ma: 4, pa: 10, cost: { wood: 200, clay: 300, gold: 100 }, time: 110, age: 2,
+    atk: 7, range: 8, rof: 2, shots: 3, sight: 10, pop: 10, trains: ['guard'], techs: ['drill', 'conscription'], cat: 'mil',
+    desc: 'Mächtiges Bollwerk. Schießt drei Pfeile gleichzeitig, bildet Kronwächter aus und bietet 10 Bevölkerung.',
+  },
+  bastion: {
+    name: 'Geschützturm', icon: '🪨', w: 2, h: 2, hp: 1400, ma: 3, pa: 10, cost: { wood: 75, clay: 175, gold: 50 }, time: 55, age: 2,
+    atk: 16, range: 9, rof: 4.5, bolt: true, bonus: { siege: 30, cav: 6 }, sight: 10, cat: 'mil',
+    desc: 'Turm mit schwerer Balliste. Langsam, aber verheerend gegen Reiter und Belagerung.',
+  },
+  wall: {
+    name: 'Lehmmauer', icon: '🚧', w: 1, h: 1, hp: 450, ma: 6, pa: 12, cost: { clay: 8 }, time: 5, age: 0, sight: 1, cat: 'mil', wallish: true,
+    desc: 'Mauerstück. Nach dem Bestätigen gleich das nächste Stück setzen.',
+  },
+  market: {
+    name: 'Markt', icon: '⚖️', w: 3, h: 3, hp: 1100, cost: { wood: 175 }, time: 45, age: 1, techs: ['guilds'], sight: 4, cat: 'eco', market: true,
+    desc: 'Tausche Nahrung, Holz und Lehm gegen Gold und zurück. Die Preise schwanken mit Angebot und Nachfrage.',
+  },
+  kiln: {
+    name: 'Brennofen', icon: '♨️', w: 2, h: 2, hp: 700, cost: { wood: 80, clay: 40 }, time: 30, age: 1, drop: ['clay'],
+    techs: ['kilnfire', 'pottery'], sight: 4, cat: 'eco', desc: 'Abgabeort für Lehm. Erforscht Töpferkunst.',
   },
   monument: {
     name: 'Kronenmonument', icon: '👑', w: 5, h: 5, hp: 4000, ma: 3, pa: 10,
@@ -134,8 +196,9 @@ export const BUILDINGS = {
   },
 };
 
-export const ECO_BUILD = ['house', 'farm', 'mill', 'lumber', 'mine', 'keep', 'monument'];
-export const MIL_BUILD = ['barracks', 'range', 'stable', 'forge', 'temple', 'tower', 'workshop'];
+export const ECO_BUILD = ['house', 'farm', 'mill', 'lumber', 'mine', 'kiln', 'market', 'keep', 'monument'];
+export const MIL_BUILD = ['barracks', 'range', 'stable', 'kennel', 'forge', 'temple', 'workshop'];
+export const DEF_BUILD = ['tower', 'wall', 'bastion', 'fortress'];
 
 export const TECHS = {
   age1: { name: 'Brennofenzeit', icon: '🏺', cost: { food: 500 }, time: 45, age: 0, ageUp: 1, desc: 'Zweites Zeitalter: Bogenschützen, Reiter, Schmiede, Türme.' },
@@ -149,5 +212,14 @@ export const TECHS = {
   arrows: { name: 'Befiederte Pfeile', icon: '🪶', cost: { food: 100, gold: 60 }, time: 35, age: 1, desc: 'Bogenschützen, Türme und Burgen plus 1 Angriff und plus 1 Reichweite.' },
   armor: { name: 'Gebrannte Rüstung', icon: '🥋', cost: { food: 150, clay: 80 }, time: 35, age: 1, desc: 'Militär plus 1 Nahkampf und plus 1 Fernkampfrüstung.' },
   herbs: { name: 'Heilkräuter', icon: '🌿', cost: { food: 100, gold: 120 }, time: 30, age: 1, desc: 'Priester heilen 50 % schneller und mit plus 2 Reichweite.' },
+  thumbring: { name: 'Daumenring', icon: '💍', cost: { food: 150, wood: 100 }, time: 35, age: 2, desc: 'Alle Fernkämpfer schießen 15 % schneller.' },
+  husbandry: { name: 'Pferdezucht', icon: '🥕', cost: { food: 150 }, time: 30, age: 1, desc: 'Berittene Einheiten und Hunde 10 % schneller.' },
+  steel: { name: 'Bronzeklingen', icon: '⚒️', cost: { food: 200, gold: 150 }, time: 45, age: 2, req: 'blades', desc: 'Nahkampfeinheiten nochmals plus 2 Angriff.' },
+  plate: { name: 'Schuppenpanzer', icon: '🦺', cost: { food: 200, gold: 150, clay: 50 }, time: 45, age: 2, req: 'armor', desc: 'Militär nochmals plus 1 Nahkampf und plus 2 Fernkampfrüstung.' },
+  drill: { name: 'Drill', icon: '🥁', cost: { food: 250, gold: 200 }, time: 45, age: 2, desc: 'Militäreinheiten werden 25 % schneller ausgebildet.' },
+  conscription: { name: 'Wehrpflicht', icon: '📯', cost: { food: 300, gold: 150 }, time: 50, age: 3, desc: 'Alle Militäreinheiten plus 15 % Lebenspunkte.' },
+  guilds: { name: 'Gilden', icon: '📜', cost: { food: 200, gold: 100 }, time: 40, age: 2, desc: 'Der Markt verlangt weniger Aufschlag beim Handel.' },
+  kilnfire: { name: 'Glutofen', icon: '🔥', cost: { food: 100, wood: 100 }, time: 30, age: 1, desc: 'Lehm sammeln 25 % schneller.' },
+  pottery: { name: 'Vorratskrüge', icon: '🫙', cost: { food: 150, clay: 100 }, time: 35, age: 1, desc: 'Häuser bieten 2 zusätzliche Bewohner.' },
   masonry: { name: 'Ziegelbau', icon: '🧱', cost: { wood: 150, clay: 150 }, time: 40, age: 2, desc: 'Alle Gebäude plus 30 % Trefferpunkte.' },
 };

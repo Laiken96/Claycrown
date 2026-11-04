@@ -9,7 +9,7 @@
 <meta name="apple-mobile-web-app-title" content="Claycrown">
 <meta name="application-name" content="Claycrown">
 <meta name="theme-color" content="#24170f">
-<meta name="description" content="Claycrown: Baue dein Reich aus Lehm, führe es durch vier Zeitalter und erobere die Krone.">
+<meta name="description" content="Claycrown 2.0: Baue dein Reich aus Lehm, führe es durch vier Zeitalter und erobere die Krone.">
 <meta name="format-detection" content="telephone=no">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icons/icon-180.png">
@@ -52,7 +52,7 @@
 
 <div id="menu" class="screen">
   <div class="panel">
-    <div class="logo"><span class="crown">👑</span><h1>Claycrown</h1><p>Baue dein Reich aus Lehm. Erobere die Krone.</p></div>
+    <div class="logo"><span class="crown">👑</span><h1>Claycrown <span class="v2">2.0</span></h1><p>Baue dein Reich aus Lehm. Erobere die Krone.</p></div>
     <div class="opts">
       <label>Gegner
         <div class="seg" data-opt="ais"><button data-v="1" class="on">1</button><button data-v="2">2</button><button data-v="3">3</button></div>
@@ -63,12 +63,20 @@
       <label>Karte
         <div class="seg" data-opt="size"><button data-v="72">Klein</button><button data-v="96" class="on">Mittel</button><button data-v="128">Groß</button></div>
       </label>
+      <label>Grafik
+        <div class="seg" data-gfx="quality"><button data-v="low">Niedrig</button><button data-v="mid">Mittel</button><button data-v="high" class="on">Hoch</button></div>
+      </label>
+      <label>Tag und Nacht
+        <div class="seg" data-gfx="dayNight"><button data-v="true" class="on">An</button><button data-v="false">Aus</button></div>
+      </label>
     </div>
     <div class="actions">
       <button id="btn-continue" class="big hidden">▶ Fortsetzen</button>
       <button id="btn-new" class="big primary">⚔ Neues Spiel</button>
       <button id="btn-help" class="big">📜 Anleitung</button>
+      <a href="classic/index.html" class="big link">🏺 Klassische Version 1.0 spielen</a>
     </div>
+    <p id="version" class="hint"></p>
     <p id="install-hint" class="hint hidden">Tipp: In Safari auf Teilen und dann „Zum Home-Bildschirm“ tippen. So läuft Claycrown im Vollbild und offline.</p>
   </div>
 </div>
@@ -80,6 +88,12 @@
       <button id="btn-resume" class="big primary">▶ Weiter</button>
       <label class="row">Tempo
         <div class="seg" id="speed-seg"><button data-v="1" class="on">1×</button><button data-v="1.5">1,5×</button><button data-v="2">2×</button></div>
+      </label>
+      <label class="row">Grafik
+        <div class="seg" data-gfx="quality"><button data-v="low">Niedrig</button><button data-v="mid">Mittel</button><button data-v="high">Hoch</button></div>
+      </label>
+      <label class="row">Tag und Nacht
+        <div class="seg" data-gfx="dayNight"><button data-v="true">An</button><button data-v="false">Aus</button></div>
       </label>
       <button id="btn-sound" class="big">🔊 Ton an</button>
       <button id="btn-help2" class="big">📜 Anleitung</button>
@@ -128,8 +142,18 @@
         <li>🌾 Nahrung von Beerensträuchern und Feldern (Feld braucht eine Mühle).</li>
         <li>🪵 Holz von Bäumen, 🪙 Gold und 🧱 Lehm aus Vorkommen.</li>
         <li>Lager (Mühle, Holzlager, Grubenlager) nahe an Rohstoffen sparen Laufwege.</li>
-        <li>Jedes Haus erlaubt 5 weitere Einwohner.</li>
+        <li>Jedes Haus erlaubt 5 weitere Einwohner, mit Vorratskrügen 7. Die Festung bietet 10.</li>
+        <li>♨️ Der Brennofen ist Lehmlager und erforscht Glutofen und Vorratskrüge.</li>
+        <li>⚖️ Am Markt tauschst du je 100 Nahrung, Holz oder Lehm gegen Gold und zurück. Wer viel verkauft, drückt den Preis. Die Kurse erholen sich mit der Zeit.</li>
       </ul>
+      <h3>Verteidigung</h3>
+      <ul>
+        <li>🗼 Wachtürme, 🪨 Geschütztürme mit schwerer Balliste und die 🏯 Festung mit drei Pfeilen pro Salve schützen dein Reich.</li>
+        <li>🚧 Lehmmauern: Stück setzen und bestätigen, das nächste Stück wird gleich daneben vorgeschlagen. Mit ✕ beenden.</li>
+        <li>Die Bauleiste hat drei Seiten: Wirtschaft, Militär und Verteidigung.</li>
+      </ul>
+      <h3>Grafik</h3>
+      <p>Unter Grafik stellst du Niedrig, Mittel oder Hoch ein. Tag und Nacht lässt sich abschalten. Ist dir Version 2.0 zu viel, startest du im Hauptmenü jederzeit die klassische Version 1.0 mit eigenem Spielstand.</p>
       <h3>Zeitalter</h3>
       <p>Lehmzeit, Brennofenzeit, Bronzezeit und Kronenzeit. Der Aufstieg erfolgt in der Burg und schaltet neue Gebäude, Einheiten und Technologien frei.</p>
       <h3>Einheiten</h3>
@@ -137,6 +161,9 @@
         <li>🔱 Speerträger schlagen Reiter. 🐎 Reiter schlagen Bogenschützen. 🏹 Bogenschützen schlagen Infanterie.</li>
         <li>🐏 Rammböcke und ☄️ Triboks zerstören Gebäude. Der Tribok schießt aus großer Entfernung, ist aber wehrlos gegen Einheiten.</li>
         <li>🗿 Tonkolosse sind die Elite der Kronenzeit.</li>
+        <li>🪃 Plänkler schlagen Bogenschützen. 🎯 Armbrustschützen durchschlagen Infanterie. 🏇 Reiterschützen sind schnell und schießen aus dem Sattel.</li>
+        <li>⚜️ Ritter sind schwer gepanzert und zerschmettern Fernkämpfer und Belagerung. 🐕 Kriegshunde aus dem Zwinger sind flinke Späher.</li>
+        <li>🗜️ Ballisten treffen Einheiten auf große Distanz und zerlegen Belagerungsgerät. 💂 Kronwächter aus der Festung sind die schwere Garde.</li>
         <li>🙏 Priester aus dem ⛪ Tempel heilen verletzte Einheiten und Arbeiter in der Nähe automatisch.</li>
         <li>Militär marschiert in Formation: Nahkampf vorn, Fernkampf dahinter, Priester und Belagerung hinten. Die Gruppe läuft im Tempo der langsamsten Einheit.</li>
       </ul>

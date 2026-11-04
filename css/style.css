@@ -68,13 +68,13 @@ button { font: inherit; color: inherit; touch-action: manipulation; cursor: poin
 #minimap-wrap { height: 100%; aspect-ratio: 1 / 1; border: 2px solid var(--line); border-radius: 6px; overflow: hidden; background: #000; flex: none; }
 #minimap { width: 100%; height: 100%; display: block; touch-action: none; image-rendering: pixelated; }
 #selinfo { flex: 1 1 200px; min-width: 150px; max-width: 340px; overflow: hidden; background: rgba(0,0,0,0.22); border-radius: 8px; padding: 6px 8px; font-size: 13px; position: relative; }
-#cmds { flex: 0 1 auto; display: grid; grid-template-columns: repeat(6, var(--btn)); grid-auto-rows: var(--btn); gap: 5px; align-content: start; }
+#cmds { flex: 0 1 auto; display: grid; grid-template-columns: repeat(7, var(--btn)); grid-auto-rows: var(--btn); gap: 5px; align-content: start; }
 
 .cmd {
   width: var(--btn); height: var(--btn); border-radius: 10px; border: 1px solid var(--line); background: var(--panel2);
   display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; padding: 0; overflow: hidden;
 }
-.cmd .ic { font-size: 22px; line-height: 1; }
+.cmd .ic { font-size: 22px; line-height: 1; white-space: nowrap; letter-spacing: -3px; }
 .cmd .lb { font-size: 9px; color: var(--muted); margin-top: 2px; white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; padding: 0 2px; }
 .cmd.poor .lb { color: #ff8b7f; }
 .cmd.locked { opacity: 0.38; }
@@ -171,7 +171,7 @@ h3 { margin: 12px 0 4px; color: var(--gold); font-size: 15px; }
 }
 /* Hochformat */
 @media (orientation: portrait) {
-  :root { --bb: 214px; --btn: 50px; }
+  :root { --bb: 214px; --btn: 46px; }
   #bottombar { flex-wrap: wrap; align-content: flex-start; }
   #minimap-wrap { height: 92px; }
   #selinfo { flex: 1 1 0; max-width: none; height: 92px; }
@@ -195,3 +195,9 @@ h3 { margin: 12px 0 4px; color: var(--gold); font-size: 15px; }
 #end-stats { margin: 0 auto; }
 #end-stats td.lbl { text-align: left; color: var(--muted); white-space: nowrap; }
 #end-stats td { text-align: right; font-variant-numeric: tabular-nums; }
+
+/* Version 2.0 */
+.logo .v2 { font-size: 0.45em; vertical-align: super; color: #fff; background: linear-gradient(#c58a3a, #8a5a22); border: 1px solid #e0a84a; border-radius: 8px; padding: 0 6px; letter-spacing: 0; text-shadow: none; }
+a.big.link { text-align: center; text-decoration: none; color: var(--muted); font-weight: 500; font-size: 14px; }
+#menu .opts label .seg button { padding: 6px 10px; min-width: 44px; }
+.cmd.wide .ic { font-size: 13px; letter-spacing: -1px; }

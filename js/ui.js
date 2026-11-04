@@ -1,5 +1,5 @@
-// Claycrown: HUD, Auswahlinfo und Befehlsleiste
-import { UNITS, BUILDINGS, TECHS, AGES, ECO_BUILD, MIL_BUILD, RES } from './data.js';
+// Claycrown 2.0: HUD, Auswahlinfo und Befehlsleiste
+import { UNITS, BUILDINGS, TECHS, AGES, ECO_BUILD, MIL_BUILD, DEF_BUILD, RES, RES_INFO } from './data.js';
 import { RES_KIND } from './world.js';
 import { costText, fmtTime } from './util.js';
 
@@ -153,9 +153,13 @@ export class UI {
       if (e.cls === 'u') {
         d = UNITS[e.type];
         const p = g.players[e.owner];
-        let atk = d.atk + (!d.proj && d.cls !== 'worker' && d.cls !== 'siege' && p.techs.blades ? 2 : 0) + (d.proj && p.techs.arrows ? 1 : 0);
-        const arm = d.cls !== 'worker' && p.techs.armor ? 1 : 0;
-        html += `<span>⚔ ${atk}</span><span>🛡 ${d.ma + arm}/${d.pa + arm}</span>`;
+        const melee = !d.proj && d.cls !== 'worker' && d.cls !== 'siege' && d.cls !== 'priest';
+        const atk = d.atk + (melee ? (p.techs.blades ? 2 : 0) + (p.techs.steel ? 2 : 0) : 0) + (d.bow && p.techs.arrows ? 1 : 0);
+        const armed = d.cls !== 'worker' && d.cls !== 'siege';
+        const am = armed ? (p.techs.armor ? 1 : 0) + (p.techs.plate ? 1 : 0) : 0, ap = armed ? (p.techs.armor ? 1 : 0) + (p.techs.plate ? 2 : 0) : 0;
+        if (d.atk) html += `<span>⚔ ${atk}</span>`;
+        html += `<span>🛡 ${d.ma + am}/${d.pa + ap}</span>`;
+        if (d.bonus) html += `<span>✚ ${Object.keys(d.bonus).map(k => ({ cav: '🐎', arch: '🏹', inf: '⚔️', siege: '🐏', bld: '🏠', worker: '👷' })[k]).join('')}</span>`;
         if (d.range) html += `<span>🎯 ${g.attackRange(e)}</span>`;
         if (e.type === 'worker' && e.owner === 0) {
           const o = e.order;
@@ -167,12 +171,14 @@ export class UI {
         d = BUILDINGS[e.type];
         if (!e.done) html += `<span>Bau ${Math.floor(e.prog * 100)} %</span>`;
         if (e.type === 'farm' && e.done) html += `<span>🌾 ${Math.ceil(e.food)}</span>`;
-        if (d.pop && e.done) html += `<span>👥 +${d.pop}</span>`;
+        if (d.pop && e.done) html += `<span>👥 +${d.pop + (e.type === 'house' && g.players[e.owner].techs.pottery ? 2 : 0)}</span>`;
+        if (d.atk && e.done) html += `<span>⚔ ${d.atk}${d.shots ? '×' + d.shots : ''}</span><span>🎯 ${d.range}</span>`;
+        if (d.market && e.done && e.owner === 0) { const p = g.players[0]; html += `<span>Kurse 🌾${Math.round(p.market.food)} 🪵${Math.round(p.market.wood)} 🧱${Math.round(p.market.clay)}</span>`; }
         if (e.type === 'monument' && e.done) html += `<span>👑 ${fmtTime(Math.max(0, 180 - e.mt))}</span>`;
         const qb = el.querySelectorAll('.queue .qp');
         if (e.queue && qb.length) {
           const q = e.queue[0];
-          const tt = q.k === 'u' ? UNITS[q.key].time : TECHS[q.key].time;
+          const tt = q.k === 'u' ? g.trainTime(e.owner, q.key) : TECHS[q.key].time;
           qb[0].style.width = Math.min(100, 100 * q.t / tt) + '%';
           if (q.blocked) html += `<span style="color:#ff8b7f">Häuser fehlen</span>`;
         }
@@ -193,7 +199,7 @@ export class UI {
     if (units.length) {
       const workers = units.some(u => u.type === 'worker');
       if (workers) {
-        const types = this.page === 'eco' ? ECO_BUILD : MIL_BUILD;
+        const types = this.page === 'eco' ? ECO_BUILD : this.page === 'mil' ? MIL_BUILD : DEF_BUILD;
         for (const t of types) {
           const d = BUILDINGS[t];
           const locked = p.age < d.age || (d.req && !g.hasDone(0, d.req));
@@ -204,7 +210,8 @@ export class UI {
             run: () => app.startPlace(t),
           });
         }
-        list.push({ key: 'page', icon: this.page === 'eco' ? '⚔️' : '🏠', label: this.page === 'eco' ? 'Militär' : 'Wirtschaft', run: () => { this.page = this.page === 'eco' ? 'mil' : 'eco'; this.cmdSig = ''; } });
+        const next = { eco: 'mil', mil: 'def', def: 'eco' }[this.page] || 'eco';
+        list.push({ key: 'page', icon: { mil: '⚔️', def: '🏯', eco: '🏠' }[next], label: { mil: 'Militär', def: 'Verteidigung', eco: 'Wirtschaft' }[next], hint: 'Bauseite wechseln: Wirtschaft, Militär, Verteidigung.', run: () => { this.page = next; this.cmdSig = ''; } });
       }
       if (units.some(u => u.type !== 'worker')) {
         list.push({ key: 'amove', icon: '🗡️', label: 'Angriff', active: app.mode && app.mode.k === 'amove', hint: 'Angriffsbewegung: Ziel antippen. Einheiten kämpfen unterwegs gegen alles.', run: () => app.setMode({ k: 'amove' }) });
@@ -249,12 +256,25 @@ export class UI {
       if (p.techs[k]) continue;
       if (t.ageUp && t.ageUp !== p.age + 1) continue;
       const researching = !!p.researching[k];
-      const locked = p.age < t.age;
+      const needT = t.req && !p.techs[t.req];
+      const locked = p.age < t.age || needT;
       list.push({
-        key: 't:' + k + researching, icon: t.icon, label: researching ? '⏳' : locked ? '🔒 ' + AGES[t.age].short : costText(t.cost),
+        key: 't:' + k + researching + needT, icon: t.icon, label: researching ? '⏳' : p.age < t.age ? '🔒 ' + AGES[t.age].short : needT ? '🔒 ' + TECHS[t.req].name : costText(t.cost),
         locked: locked || researching, poor: !g.canAfford(p, t.cost), hint: `${t.name}: ${t.desc} Kosten ${costText(t.cost)}`,
         run: () => app.researchSel(k),
       });
+    }
+    if (d.market) {
+      for (const k of ['food', 'wood', 'clay']) {
+        const ic = RES_INFO[k].icon;
+        list.push({ key: 'sell:' + k, icon: `${ic}→🪙`, label: `+${g.tradeQuote(0, k, false)}`, poor: p.res[k] < 100,
+          hint: `100 ${RES_INFO[k].name} verkaufen für ${g.tradeQuote(0, k, false)} Gold.`, run: () => app.trade(k, false) });
+      }
+      for (const k of ['food', 'wood', 'clay']) {
+        const ic = RES_INFO[k].icon;
+        list.push({ key: 'buy:' + k, icon: `🪙→${ic}`, label: `−${g.tradeQuote(0, k, true)}`, poor: p.res.gold < g.tradeQuote(0, k, true),
+          hint: `100 ${RES_INFO[k].name} kaufen für ${g.tradeQuote(0, k, true)} Gold.`, run: () => app.trade(k, true) });
+      }
     }
     if (d.trains) list.push({ key: 'rally', icon: '🚩', label: 'Sammelpunkt', active: app.mode && app.mode.k === 'rally', hint: 'Sammelpunkt: Ort antippen, an dem neue Einheiten warten.', run: () => app.setMode({ k: 'rally' }) });
     list.push({ key: 'del', icon: '🗑️', label: 'Abreißen', run: () => app.demolishSel(false) });
@@ -271,6 +291,7 @@ export class UI {
         const b = document.createElement('button');
         b.className = 'cmd';
         b.innerHTML = `<span class="ic">${c.icon}</span><span class="lb"></span><span class="badge"></span>`;
+        if ([...c.icon].length > 2) b.classList.add('wide');
         b.addEventListener('click', () => {
           const cur = this.current.find(x => x.key === c.key);
           if (!cur) return;
@@ -318,6 +339,7 @@ export class UI {
       ['Forschungen', p => st(p).techs || 0], ['Geheilt (Lebenspunkte)', p => Math.round(st(p).healed || 0)],
     ];
     const head = `<tr><th></th>${ps.map(p => `<th style="color:${p.color}">${p.name}</th>`).join('')}</tr>`;
+    rows.push(['Handelsgeschäfte', p => st(p).traded || 0]);
     $('end-stats').innerHTML = head + rows.map(([n, f]) => `<tr><td class="lbl">${n}</td>${ps.map(p => `<td>${f(p)}</td>`).join('')}</tr>`).join('');
     this.endTab = this.endTab || 0;
     const tabs = $('end-tabs');

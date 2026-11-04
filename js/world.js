@@ -1,4 +1,4 @@
-// Claycrown: Simulation
+// Claycrown 2.0: Simulation
 import {
   SIM_DT, MAX_POP, MONUMENT_TIME, UNITS, BUILDINGS, TECHS, PLAYER_COLORS, PLAYER_NAMES, RES_INFO,
 } from './data.js';
@@ -8,7 +8,8 @@ export const T = { GRASS: 0, WATER: 1, SHALLOW: 2, SAND: 3, DIRT: 4 };
 export const RES_KIND = { tree: 'wood', gold: 'gold', clay: 'clay', berry: 'food' };
 const RES_AMOUNT = { tree: 100, gold: 800, clay: 800, berry: 125 };
 const BASE_RATE = { tree: 0.48, gold: 0.40, clay: 0.44, berry: 0.50, farm: 0.44 };
-const CORE = new Set(['keep', 'barracks', 'range', 'stable', 'forge', 'temple', 'tower', 'workshop', 'monument']);
+const CORE = new Set(['keep', 'barracks', 'range', 'stable', 'forge', 'temple', 'tower', 'workshop', 'monument', 'kennel', 'fortress', 'bastion']);
+const MARKET_KINDS = ['food', 'wood', 'clay'];
 const DX = [1, -1, 0, 0, 1, 1, -1, -1];
 const DY = [0, 0, 1, -1, 1, -1, 1, -1];
 const CELL = 4;
@@ -65,7 +66,7 @@ export class Game {
       this.players.push({
         id: i, name: PLAYER_NAMES[i], color: PLAYER_COLORS[i], isAI: i > 0, ai: i > 0 ? {} : null,
         res: { food: 200, wood: 200, gold: 100, clay: 100 }, age: 0, techs: {}, researching: {},
-        pop: 0, popCap: 0, defeated: false, stats: { gathered: 0, trained: 0, killed: 0, lost: 0, built: 0, bKilled: 0, bLost: 0, techs: 0, healed: 0, peakPop: 0, ageT: [0], res: { food: 0, wood: 0, gold: 0, clay: 0 } },
+        market: { food: 100, wood: 100, clay: 100 }, pop: 0, popCap: 0, defeated: false, stats: { gathered: 0, trained: 0, killed: 0, lost: 0, built: 0, bKilled: 0, bLost: 0, techs: 0, healed: 0, peakPop: 0, ageT: [0], res: { food: 0, wood: 0, gold: 0, clay: 0 } },
       });
     }
     this.initAiFog();
@@ -102,7 +103,7 @@ export class Game {
   // ---------- Speichern und Laden ----------
   toJSON() {
     return {
-      v: 1, W: this.W, H: this.H, seed: this.seed, difficulty: this.difficulty, time: this.time, nextId: this.nextId,
+      v: 2, W: this.W, H: this.H, seed: this.seed, difficulty: this.difficulty, time: this.time, nextId: this.nextId,
       over: this.over, winner: this.winner, revealAll: this.revealAll, spawns: this.spawns, history: this.history,
       aiFog: Object.fromEntries(Object.entries(this.aiFog || {}).map(([k, v]) => [k, Array.from(v)])),
       terrain: Array.from(this.terrain), vis: Array.from(this.vis), players: this.players,
@@ -118,6 +119,7 @@ export class Game {
     this._alloc();
     this.players = d.players;
     this.history = d.history || [];
+    for (const p of this.players) p.market = p.market || { food: 100, wood: 100, clay: 100 };
     for (const p of this.players) p.stats = Object.assign({ bKilled: 0, bLost: 0, techs: 0, healed: 0, peakPop: 0, ageT: [0], res: { food: 0, wood: 0, gold: 0, clay: 0 } }, p.stats);
     this.initAiFog(d.aiFog || {});
     for (let i = 0; i < this.terrain.length; i++) this.blk[i] = this.terrain[i] === T.WATER ? 1 : 0;
@@ -262,14 +264,24 @@ export class Game {
 
   // ---------- Entitäten ----------
   addUnit(type, owner, x, y) {
-    const d = UNITS[type];
+    const d = UNITS[type], hp = this.uMaxHp(owner, type);
     const u = {
-      id: this.nextId++, cls: 'u', type, owner, x, y, px: x, py: y, hp: d.hp, maxHp: d.hp,
+      id: this.nextId++, cls: 'u', type, owner, x, y, px: x, py: y, hp, maxHp: hp,
       order: null, path: null, pi: 0, pkey: null, repT: 0, cool: Math.random() * 0.3, carry: null, carryN: 0,
       dir: Math.PI / 2, walk: 0, scanT: Math.random() * 0.5, stT: 0, stX: x, stY: y, stN: 0, work: 0, atkT: 0,
     };
     this.ents.set(u.id, u);
     return u;
+  }
+
+  uMaxHp(owner, type) {
+    const d = UNITS[type], p = this.players[owner];
+    return Math.round(d.hp * (p && p.techs.conscription && d.cls !== 'worker' ? 1.15 : 1));
+  }
+  isMil(type) { return UNITS[type].cls !== 'worker'; }
+  trainTime(owner, key) {
+    const p = this.players[owner];
+    return UNITS[key].time * (p.techs.drill && key !== 'worker' ? 0.75 : 1);
   }
 
   bMaxHp(owner, type) { return Math.round(BUILDINGS[type].hp * (this.players[owner].techs.masonry ? 1.3 : 1)); }
@@ -324,7 +336,7 @@ export class Game {
   recalcPop() {
     for (const p of this.players) p.popCap = 0;
     for (const e of this.ents.values()) {
-      if (e.cls === 'b' && e.done) { const pop = BUILDINGS[e.type].pop; if (pop) this.players[e.owner].popCap += pop; }
+      if (e.cls === 'b' && e.done) { const pop = BUILDINGS[e.type].pop; if (pop) this.players[e.owner].popCap += pop + (e.type === 'house' && this.players[e.owner].techs.pottery ? 2 : 0); }
     }
     for (const p of this.players) p.popCap = Math.min(MAX_POP, p.popCap);
     for (const p of this.players) p.pop = 0;
@@ -341,6 +353,7 @@ export class Game {
     let r = BASE_RATE[kind];
     if (kind === 'tree' && p.techs.axe) r *= 1.2;
     if ((kind === 'gold' || kind === 'clay') && p.techs.pick) r *= 1.2;
+    if (kind === 'clay' && p.techs.kilnfire) r *= 1.25;
     if (kind === 'farm' && p.techs.plow) r *= 1.2;
     if (p.isAI) r *= AI_MULT[this.difficulty] || 1;
     return r;
@@ -348,7 +361,8 @@ export class Game {
   carryCap(p) { return p.techs.wheelbarrow ? 15 : 10; }
   unitSpeed(u) {
     const d = UNITS[u.type];
-    let sp = d.speed * (u.type === 'worker' && this.players[u.owner].techs.wheelbarrow ? 1.1 : 1);
+    const pt = this.players[u.owner].techs;
+    let sp = d.speed * (u.type === 'worker' && pt.wheelbarrow ? 1.1 : 1) * ((d.mounted || d.beast) && pt.husbandry ? 1.1 : 1);
     const o = u.order;
     if (o && o.cap && (o.t === 'move' || o.t === 'amove')) sp = Math.min(sp, o.cap);
     return sp;
@@ -414,6 +428,7 @@ export class Game {
     if (p.techs[key] || p.researching[key]) return 'Bereits erforscht';
     if (t.ageUp && t.ageUp !== p.age + 1) return 'Nicht verfügbar';
     if (p.age < t.age) return 'Benötigt ' + ['Lehmzeit', 'Brennofenzeit', 'Bronzezeit', 'Kronenzeit'][t.age];
+    if (t.req && !p.techs[t.req]) return 'Benötigt ' + TECHS[t.req].name;
     if (b.queue.length >= 6) return 'Warteschlange voll';
     const m = this.missing(p, t.cost);
     if (m) return 'Nicht genug ' + m;
@@ -770,7 +785,7 @@ export class Game {
   attackRange(u) {
     const d = UNITS[u.type];
     if (!d.range) return 0.3;
-    return d.range + (d.cls === 'arch' && this.players[u.owner].techs.arrows ? 1 : 0);
+    return d.range + (d.bow && this.players[u.owner].techs.arrows ? 1 : 0);
   }
 
   calcDamage(att, tgt, pierce) {
@@ -778,16 +793,17 @@ export class Game {
     const p = this.players[att.owner];
     let a = ad.atk;
     if (att.cls === 'u') {
-      if (!ad.proj && ad.cls !== 'worker' && ad.cls !== 'siege' && p.techs.blades) a += 2;
-      if (ad.proj && ad.cls === 'arch' && p.techs.arrows) a += 1;
-    } else if (p.techs.arrows) a += 1;
+      if (!ad.proj && ad.cls !== 'worker' && ad.cls !== 'siege' && ad.cls !== 'priest') a += (p.techs.blades ? 2 : 0) + (p.techs.steel ? 2 : 0);
+      if (ad.bow && p.techs.arrows) a += 1;
+    } else if (p.techs.arrows && !ad.bolt) a += 1;
     const tc = tgt.cls === 'u' ? UNITS[tgt.type].cls : 'bld';
     if (ad.bonus && ad.bonus[tc]) a += ad.bonus[tc];
     let arm;
     if (tgt.cls === 'u') {
       const td = UNITS[tgt.type];
       arm = pierce ? td.pa : td.ma;
-      if (td.cls !== 'worker' && this.players[tgt.owner].techs.armor) arm += 1;
+      const tt = this.players[tgt.owner].techs;
+      if (td.cls !== 'worker' && td.cls !== 'siege') arm += (tt.armor ? 1 : 0) + (tt.plate ? (pierce ? 2 : 1) : 0);
     } else {
       const td = BUILDINGS[tgt.type];
       arm = pierce ? td.pa ?? 6 : td.ma ?? 2;
@@ -798,15 +814,17 @@ export class Game {
   strike(u, t) {
     const d = UNITS[u.type];
     if (d.proj) this.spawnProjectile(u, t);
-    else { this.applyDamage(t, this.calcDamage(u, t, false), u.owner, u.id); this.emit({ type: 'hit', x: t.x, y: t.y, owner: u.owner, melee: true }); }
+    else { this.emit({ type: 'hit', x: t.x, y: t.y, owner: u.owner, melee: true, bld: t.cls === 'b', ax: u.x, ay: u.y }); this.applyDamage(t, this.calcDamage(u, t, false), u.owner, u.id); }
   }
 
   spawnProjectile(src, tgt) {
     const sy = src.cls === 'b' ? src.y - 1.2 : src.y - 0.2;
+    const sd = src.cls === 'u' ? UNITS[src.type] : BUILDINGS[src.type];
+    const kind = sd.stone ? 'stone' : sd.bolt ? 'bolt' : sd.javelin ? 'jav' : 'arrow';
     this.projectiles.push({
       x: src.x, y: sy, sx: src.x, sy, tid: tgt.id, dmg: this.calcDamage(src, tgt, true), owner: src.owner, aid: src.id,
-      spd: src.cls === 'u' && UNITS[src.type].stone ? 7 : 10, d0: Math.max(0.5, Math.hypot(tgt.x - src.x, tgt.y - sy)),
-      stone: src.cls === 'u' && !!UNITS[src.type].stone,
+      spd: kind === 'stone' ? 7 : kind === 'bolt' ? 13 : kind === 'jav' ? 9 : 10, d0: Math.max(0.5, Math.hypot(tgt.x - src.x, tgt.y - sy)),
+      stone: kind === 'stone', kind,
     });
     if (src.owner === 0 || this.vis[Math.floor(src.y) * this.W + Math.floor(src.x)] === 2) this.emit({ type: 'shoot', x: src.x, y: src.y });
   }
@@ -840,12 +858,12 @@ export class Game {
       p.stats.lost++;
       if (by >= 0 && this.players[by]) this.players[by].stats.killed++;
       this.decals.push({ k: 'corpse', x: e.x, y: e.y, t: 0, owner: e.owner, type: e.type });
-      this.emit({ type: 'death', x: e.x, y: e.y, owner: e.owner });
+      this.emit({ type: 'death', x: e.x, y: e.y, owner: e.owner, utype: e.type });
     } else if (e.cls === 'b') {
       for (const q of e.queue) if (q.k === 't') delete p.researching[q.key];
       this.decals.push({ k: 'rubble', x: e.tx, y: e.ty, w: e.w, h: e.h, t: 0 });
       if (e.done || e.prog > 0.2) { p.stats.bLost++; if (by >= 0 && this.players[by]) this.players[by].stats.bKilled++; }
-      this.emit({ type: 'destroyed', x: e.x, y: e.y, owner: e.owner, btype: e.type });
+      this.emit({ type: 'destroyed', x: e.x, y: e.y, owner: e.owner, btype: e.type, w: e.w, h: e.h, tx: e.tx, ty: e.ty });
       this.recalcPop();
     }
   }
@@ -868,6 +886,47 @@ export class Game {
       if (d < bd) { bd = d; best = v; }
     });
     return best;
+  }
+
+  // Mehrere Ziele für Gebäude mit mehreren Schüssen. Ziele mit Bonus werden bevorzugt.
+  findEnemyUnits(owner, x, y, r, n, bonus) {
+    const cands = [];
+    this.near(x, y, r, v => {
+      if (v.owner === owner || v.dead) return;
+      const d = Math.hypot(v.x - x, v.y - y);
+      if (d > r) return;
+      cands.push({ v, s: d - (bonus && bonus[UNITS[v.type].cls] ? 4 : 0) });
+    });
+    if (cands.length > 1) cands.sort((a, b) => a.s - b.s);
+    const out = [];
+    for (let i = 0; i < cands.length && out.length < n; i++) out.push(cands[i].v);
+    while (out.length && out.length < n && cands.length) out.push(out[out.length % cands.length]);
+    return out;
+  }
+
+  // ---------- Markt ----------
+  tradeQuote(owner, kind, buy) {
+    const p = this.players[owner], base = p.market[kind];
+    const fee = p.techs.guilds ? 0.15 : 0.3;
+    return buy ? Math.round(base * (1 + fee)) : Math.round(base * (1 - fee));
+  }
+  trade(owner, kind, buy) {
+    const p = this.players[owner];
+    if (!MARKET_KINDS.includes(kind)) return 'Nicht möglich';
+    if (!this.blds.some(b => b.owner === owner && b.done && !b.dead && BUILDINGS[b.type].market) && !this.hasDone(owner, 'market')) return 'Benötigt Markt';
+    const q = this.tradeQuote(owner, kind, buy);
+    if (buy) {
+      if (p.res.gold < q) return 'Nicht genug Gold';
+      p.res.gold -= q; p.res[kind] += 100;
+      p.market[kind] = Math.min(300, p.market[kind] + 6);
+    } else {
+      if (p.res[kind] < 100) return 'Nicht genug ' + RES_INFO[kind].name;
+      p.res[kind] -= 100; p.res.gold += q;
+      p.market[kind] = Math.max(25, p.market[kind] - 6);
+    }
+    p.stats.traded = (p.stats.traded || 0) + 1;
+    this.emit({ type: 'trade', owner });
+    return true;
   }
 
   findTarget(u, r) {
@@ -971,7 +1030,12 @@ export class Game {
     this.updateProjectiles(dt);
     for (let i = this.decals.length - 1; i >= 0; i--) {
       const d = this.decals[i]; d.t += dt;
-      if (d.t > (d.k === 'rubble' ? 40 : 20)) this.decals.splice(i, 1);
+      if (d.t > (d.k === 'rubble' ? 40 : d.k === 'stump' ? 400 : 20)) this.decals.splice(i, 1);
+    }
+    this.marketT = (this.marketT || 0) - dt;
+    if (this.marketT <= 0) {
+      this.marketT = 5;
+      for (const p of this.players) for (const k of MARKET_KINDS) p.market[k] += (100 - p.market[k]) * 0.04;
     }
     this.fogT -= dt;
     if (this.fogT <= 0) { this.fogT = 0.2; this.updateFog(); }
@@ -1059,7 +1123,7 @@ export class Game {
     if (this.edgeDist(u, t) <= r) {
       u.path = null;
       u.dir = Math.atan2(t.y - u.y, t.x - u.x);
-      if (u.cool <= 0) { this.strike(u, t); u.cool = d.rof; u.atkT = 0.35; }
+      if (u.cool <= 0) { this.strike(u, t); u.cool = d.rof * (d.proj && d.cls !== 'siege' && this.players[u.owner].techs.thumbring ? 0.85 : 1); u.atkT = 0.35; }
     } else this.approach(u, t, r);
   }
 
@@ -1136,7 +1200,10 @@ export class Game {
     } else {
       u.dir = Math.atan2(r.y - u.y, r.x - u.x);
       r.amount -= amt;
-      if (r.amount <= 1e-6) this.removeEnt(r);
+      if (r.amount <= 1e-6) {
+        this.removeEnt(r);
+        if (r.kind === 'tree') this.decals.push({ k: 'stump', x: r.x, y: r.y, t: 0, v: r.v });
+      }
     }
   }
 
@@ -1233,7 +1300,7 @@ export class Game {
         } else {
           q.blocked = false;
           q.t += dt * (p.isAI ? AI_MULT[this.difficulty] || 1 : 1);
-          if (q.t >= UNITS[q.key].time) { b.queue.shift(); this.spawnFrom(b, q.key); p.pop++; }
+          if (q.t >= this.trainTime(b.owner, q.key)) { b.queue.shift(); this.spawnFrom(b, q.key); p.pop++; }
         }
       } else {
         q.t += dt;
@@ -1243,9 +1310,9 @@ export class Game {
     if (d.atk) {
       b.cool -= dt;
       if (b.cool <= 0) {
-        const r = d.range + (p.techs.arrows ? 1 : 0) + Math.max(b.w, b.h) / 2;
-        const t = this.findEnemyUnit(b.owner, b.x, b.y, r);
-        if (t) { this.spawnProjectile(b, t); b.cool = d.rof; } else b.cool = 0.4;
+        const r = d.range + (p.techs.arrows && !d.bolt ? 1 : 0) + Math.max(b.w, b.h) / 2;
+        const ts = this.findEnemyUnits(b.owner, b.x, b.y, r, d.shots || 1, d.bonus);
+        if (ts.length) { for (const t of ts) this.spawnProjectile(b, t); b.cool = d.rof; } else b.cool = 0.4;
       }
     }
     if (b.type === 'monument') {
@@ -1274,6 +1341,12 @@ export class Game {
     p.stats.techs = (p.stats.techs || 0) + 1;
     if (t.ageUp) { p.age = t.ageUp; if (p.stats.ageT) p.stats.ageT[t.ageUp] = Math.round(this.time); this.emit({ type: 'age', owner: p.id, age: p.age }); }
     else this.emit({ type: 'tech', owner: p.id, key });
+    if (key === 'pottery') this.recalcPop();
+    if (key === 'conscription') {
+      for (const u of this.ents.values()) if (u.cls === 'u' && u.owner === p.id && u.type !== 'worker') {
+        const nm = this.uMaxHp(p.id, u.type); u.hp = (u.hp * nm) / u.maxHp; u.maxHp = nm;
+      }
+    }
     if (key === 'masonry') {
       for (const b of this.ents.values()) if (b.cls === 'b' && b.owner === p.id) {
         const nm = this.bMaxHp(p.id, b.type); b.hp = (b.hp * nm) / b.maxHp; b.maxHp = nm;
@@ -1288,7 +1361,10 @@ export class Game {
       const t = this.ents.get(pr.tid);
       if (!t) { ps.splice(i, 1); continue; }
       const dx = t.x - pr.x, dy = t.y - 0.2 - pr.y, d = Math.hypot(dx, dy), step = pr.spd * dt;
-      if (d <= step) { this.applyDamage(t, pr.dmg, pr.owner, this.ents.has(pr.aid) ? pr.aid : 0); ps.splice(i, 1); continue; }
+      if (d <= step) {
+        this.emit({ type: 'impact', x: t.x, y: t.y, kind: pr.kind || (pr.stone ? 'stone' : 'arrow'), bld: t.cls === 'b' });
+        this.applyDamage(t, pr.dmg, pr.owner, this.ents.has(pr.aid) ? pr.aid : 0); ps.splice(i, 1); continue;
+      }
       pr.x += (dx / d) * step; pr.y += (dy / d) * step;
       pr.dir = Math.atan2(dy, dx);
     }

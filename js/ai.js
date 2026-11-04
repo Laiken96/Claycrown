@@ -1,11 +1,11 @@
-// Claycrown: Computergegner
+// Claycrown 2.0: Computergegner
 import { UNITS, BUILDINGS, TECHS, MAX_POP } from './data.js';
 import { RES_KIND } from './world.js';
 
 const DIFF = {
-  easy: { workers: 16, firstAttack: 900, wave: 4, waveGrow: 1, armyRatio: 0.5, think: 1.6, towers: 0, monument: false, ageWorkers: [14, 18, 22], milStart: 16, gangUp: false },
-  normal: { workers: 28, firstAttack: 660, wave: 6, waveGrow: 1, armyRatio: 0.8, think: 1.0, towers: 1, monument: false, ageWorkers: [13, 20, 24], milStart: 14, gangUp: false },
-  hard: { workers: 40, firstAttack: 360, wave: 9, waveGrow: 2, armyRatio: 1.5, think: 0.6, towers: 2, monument: true, ageWorkers: [12, 20, 26], milStart: 10, gangUp: true },
+  easy: { workers: 16, firstAttack: 900, wave: 4, waveGrow: 1, armyRatio: 0.5, think: 1.6, towers: 0, bastions: 0, fortress: false, kennel: false, monument: false, ageWorkers: [14, 18, 22], milStart: 16, gangUp: false },
+  normal: { workers: 28, firstAttack: 660, wave: 6, waveGrow: 1, armyRatio: 0.8, think: 1.0, towers: 1, bastions: 1, fortress: true, kennel: true, monument: false, ageWorkers: [13, 20, 24], milStart: 14, gangUp: false },
+  hard: { workers: 40, firstAttack: 360, wave: 9, waveGrow: 2, armyRatio: 1.5, think: 0.6, towers: 2, bastions: 2, fortress: true, kennel: true, monument: true, ageWorkers: [12, 20, 26], milStart: 10, gangUp: true },
 };
 
 const RATIOS = [
@@ -70,7 +70,7 @@ export class AI {
     // Häuser
     const queuedUnits = blds.reduce((n, b) => n + b.queue.filter(q => q.k === 'u').length, 0);
     const housesPending = (by.house || []).filter(b => !b.done).length;
-    const prod = count('barracks') + count('range') + count('stable') + count('workshop');
+    const prod = count('barracks') + count('range') + count('stable') + count('workshop') + count('kennel') + count('fortress');
     if (p.popCap < MAX_POP && p.pop + queuedUnits + 1 + prod >= p.popCap && housesPending < (prod > 1 ? 2 : 1)) {
       this.build('house', workers, false);
     }
@@ -81,6 +81,7 @@ export class AI {
     if (W >= 7 && count('mill') < 1) want.push('mill');
     if (W >= 10 && count('mine') < 1) want.push('mine');
     if (W >= c.milStart && count('barracks') < 1) want.push('barracks');
+    if (c.kennel && W >= c.milStart + 2 && count('kennel') < 1) want.push('kennel');
     if (p.age >= 1) {
       if (count('forge') < 1) want.push('forge');
       if (count('range') < 1) want.push('range');
@@ -89,11 +90,15 @@ export class AI {
       if (W >= 16 && count('mine') < 2) want.push('mine');
       if (count('tower') < c.towers) want.push('tower');
       if (W >= 20 && count('temple') < 1) want.push('temple');
+      if (W >= 18 && count('kiln') < 1) want.push('kiln');
+      if (W >= 22 && count('market') < 1) want.push('market');
     }
     if (p.age >= 2) {
       if (count('workshop') < 1) want.push('workshop');
       if (count('barracks') < 2 && W >= 24) want.push('barracks');
       if (count('range') < 2 && this.cfg === DIFF.hard) want.push('range');
+      if (c.fortress && W >= 24 && count('fortress') < 1) want.push('fortress');
+      if (count('bastion') < c.bastions && W >= 22) want.push('bastion');
     }
     if (p.age >= 3 && c.monument && count('monument') < 1) want.push('monument');
     const pending = blds.filter(b => !b.done && b.type !== 'farm' && b.type !== 'house').length;
@@ -109,6 +114,7 @@ export class AI {
     if (W >= c.milStart - 2 || this.s.threatNow) this.trainArmy(blds);
     if (W >= 12) this.researchTechs(blds);
     this.manageAttack(army);
+    this.trade();
     if (!keep && p.age >= 1 && W > 0) this.build('keep', workers, true);
   }
 
@@ -263,7 +269,7 @@ export class AI {
     if (!u) {
       if (s.scoutId) { s.scoutId = 0; s.scoutRetry = g.time + 60; return; }
       if (g.time < (s.scoutRetry || 0)) return;
-      u = army.find(a => a.type === 'rider') || army.find(a => a.type !== 'ram');
+      u = army.find(a => a.type === 'dog') || army.find(a => a.type === 'rider') || army.find(a => UNITS[a.type].cls !== 'siege');
       if (!u) return;
       s.scoutId = u.id;
       u.passive = true;
@@ -351,10 +357,25 @@ export class AI {
     return r;
   }
 
+  // Überschüsse am Markt in Gold tauschen und Engpässe ausgleichen
+  trade() {
+    const g = this.g, p = this.p;
+    if (!g.hasDone(this.pid, 'market')) return;
+    for (const k of ['food', 'wood', 'clay']) {
+      if (p.res[k] > 900 && p.res.gold < 400) { g.trade(this.pid, k, false); return; }
+    }
+    if (p.res.gold > 700) {
+      const low = ['food', 'wood', 'clay'].sort((a, b) => p.res[a] - p.res[b])[0];
+      if (p.res[low] < 150) g.trade(this.pid, low, true);
+    }
+  }
+
   // ---------- Militär ----------
   trainArmy(blds) {
     const g = this.g, p = this.p;
-    const rams = [...g.ents.values()].filter(e => e.cls === 'u' && e.owner === this.pid && UNITS[e.type].siege).length;
+    const mine = [...g.ents.values()].filter(e => e.cls === 'u' && e.owner === this.pid);
+    const rams = mine.filter(e => UNITS[e.type].cls === 'siege').length;
+    const dogs = mine.filter(e => e.type === 'dog').length;
     for (const b of blds) {
       if (!b.done || b.queue.length >= 2) continue;
       const trains = (BUILDINGS[b.type].trains || []).filter(k => k !== 'worker' && UNITS[k].age <= p.age);
@@ -365,8 +386,11 @@ export class AI {
         else if (p.age >= 1 && Math.random() < 0.6) pick = 'sword';
         else pick = 'spear';
         if (!trains.includes(pick)) pick = trains[0];
-      } else pick = trains[Math.floor(Math.random() * trains.length)];
-      if (UNITS[pick].siege && rams >= 4) continue;
+      } else if (b.type === 'range' && trains.includes('crossbow') && Math.random() < 0.55) pick = 'crossbow';
+      else if (b.type === 'stable' && trains.includes('knight') && Math.random() < 0.5) pick = 'knight';
+      else pick = trains[Math.floor(Math.random() * trains.length)];
+      if (UNITS[pick].cls === 'siege' && rams >= 4) continue;
+      if (pick === 'dog' && dogs >= 3) continue;
       if (pick === 'priest' && [...g.ents.values()].filter(e => e.cls === 'u' && e.owner === this.pid && e.type === 'priest').length >= 3) continue;
       if (!this.s.threatNow && this.armySize >= Math.max(6, this.workers * this.cfg.armyRatio)) return;
       if (p.pop >= p.popCap) return;
@@ -381,7 +405,7 @@ export class AI {
       if (!b.done || b.queue.length) continue;
       for (const k of BUILDINGS[b.type].techs || []) {
         const t = TECHS[k];
-        if (t.ageUp || p.techs[k] || p.researching[k] || p.age < t.age) continue;
+        if (t.ageUp || p.techs[k] || p.researching[k] || p.age < t.age || (t.req && !p.techs[t.req])) continue;
         const cost = t.cost;
         const surplus = {};
         for (const r in cost) surplus[r] = cost[r] + 60;

@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Claycrown">
+<meta name="application-name" content="Claycrown">
+<meta name="theme-color" content="#24170f">
+<meta name="description" content="Claycrown: Baue dein Reich aus Lehm, führe es durch vier Zeitalter und erobere die Krone.">
+<meta name="format-detection" content="telephone=no">
+<link rel="apple-touch-icon" href="../icons/icon-180.png">
+<link rel="icon" type="image/png" sizes="192x192" href="../icons/icon-192.png">
+<title>Claycrown Classic</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="game" class="hidden">
+  <canvas id="view"></canvas>
+  <div id="topbar">
+    <div class="res" id="r-food"><i>🌾</i><b>0</b></div>
+    <div class="res" id="r-wood"><i>🪵</i><b>0</b></div>
+    <div class="res" id="r-gold"><i>🪙</i><b>0</b></div>
+    <div class="res" id="r-clay"><i>🧱</i><b>0</b></div>
+    <div class="res" id="r-pop"><i>👥</i><b>0/0</b></div>
+    <div id="age-label">Lehmzeit</div>
+    <div class="spacer"></div>
+    <div id="clock">00:00</div>
+  </div>
+  <div id="quick">
+    <button id="btn-menu" class="menu" aria-label="Menü">⏸</button>
+    <button id="btn-idle" aria-label="Untätige Arbeiter">👷<span id="idle-count">0</span></button>
+    <button id="btn-army" aria-label="Ganze Armee wählen">⚔️</button>
+    <button id="btn-home" aria-label="Zur Burg">🏰</button>
+  </div>
+  <div id="bottombar">
+    <div id="minimap-wrap"><canvas id="minimap" width="256" height="256"></canvas></div>
+    <div id="selinfo"></div>
+    <div id="cmds"></div>
+  </div>
+  <div id="modebar" class="hidden">
+    <span id="mode-label"></span>
+    <button id="mode-ok" class="ok">✓</button>
+    <button id="mode-cancel" class="cancel">✕</button>
+  </div>
+  <div id="toasts"></div>
+  <div id="monument-banner" class="hidden"></div>
+</div>
+
+<div id="menu" class="screen">
+  <div class="panel">
+    <div class="logo"><span class="crown">👑</span><h1>Claycrown</h1><p>Klassische Version 1.0</p></div>
+    <div class="opts">
+      <label>Gegner
+        <div class="seg" data-opt="ais"><button data-v="1" class="on">1</button><button data-v="2">2</button><button data-v="3">3</button></div>
+      </label>
+      <label>Schwierigkeit
+        <div class="seg" data-opt="difficulty"><button data-v="easy">Leicht</button><button data-v="normal" class="on">Normal</button><button data-v="hard">Schwer</button></div>
+      </label>
+      <label>Karte
+        <div class="seg" data-opt="size"><button data-v="72">Klein</button><button data-v="96" class="on">Mittel</button><button data-v="128">Groß</button></div>
+      </label>
+    </div>
+    <div class="actions">
+      <button id="btn-continue" class="big hidden">▶ Fortsetzen</button>
+      <button id="btn-new" class="big primary">⚔ Neues Spiel</button>
+      <button id="btn-help" class="big">📜 Anleitung</button>
+      <a href="../index.html" class="big" style="text-align:center;text-decoration:none">⬅ Zurück zu Version 2.0</a>
+    </div>
+    <p id="install-hint" class="hint hidden">Tipp: In Safari auf Teilen und dann „Zum Home-Bildschirm“ tippen. So läuft Claycrown im Vollbild und offline.</p>
+  </div>
+</div>
+
+<div id="pause" class="screen hidden">
+  <div class="panel small">
+    <h2>Pause</h2>
+    <div class="actions">
+      <button id="btn-resume" class="big primary">▶ Weiter</button>
+      <label class="row">Tempo
+        <div class="seg" id="speed-seg"><button data-v="1" class="on">1×</button><button data-v="1.5">1,5×</button><button data-v="2">2×</button></div>
+      </label>
+      <button id="btn-sound" class="big">🔊 Ton an</button>
+      <button id="btn-help2" class="big">📜 Anleitung</button>
+      <button id="btn-save-quit" class="big">💾 Speichern und Hauptmenü</button>
+      <button id="btn-surrender" class="big danger">🏳 Aufgeben</button>
+    </div>
+  </div>
+</div>
+
+<div id="end" class="screen hidden">
+  <div class="panel small end">
+    <h2 id="end-title">Sieg</h2>
+    <p id="end-text"></p>
+    <div class="seg" id="end-tabs"><button class="on">Bevölkerung</button><button>Armeewert</button><button>Gesammelt</button></div>
+    <canvas id="end-chart"></canvas>
+    <div class="stats-wrap"><table id="end-stats"></table></div>
+    <div class="actions"><button id="btn-end-menu" class="big primary">Hauptmenü</button></div>
+  </div>
+</div>
+
+<div id="help" class="screen hidden">
+  <div class="panel help">
+    <h2>Anleitung</h2>
+    <div class="helptext">
+      <h3>Ziel</h3>
+      <p>Zerstöre die Burgen und Militärgebäude deiner Gegner. Wer 30 Sekunden lang weder Burg noch Militärgebäude besitzt, ist besiegt. Häuser, Lager und Felder zählen nicht. Alternativ errichtest du in der Kronenzeit das Kronenmonument und hältst es 3 Minuten lang.</p>
+      <h3>Steuerung am Touchscreen</h3>
+      <ul>
+        <li><b>Tippen</b> auf eigene Einheit oder Gebäude wählt es aus.</li>
+        <li><b>Doppelt tippen</b> wählt alle sichtbaren Einheiten desselben Typs.</li>
+        <li><b>Gedrückt halten und ziehen</b> zieht einen Auswahlrahmen.</li>
+        <li><b>Mit Auswahl tippen</b>: auf Boden bewegen, auf Feind angreifen, auf Baum, Gold, Lehm oder Beeren sammeln, auf eigene Baustelle mitbauen.</li>
+        <li><b>Mit einem Finger ziehen</b> verschiebt die Karte, <b>zwei Finger</b> zoomen.</li>
+        <li><b>Minikarte</b> antippen springt zu dieser Stelle.</li>
+        <li><b>Arbeiter</b> mit 📦 Last abliefern lassen, mit 🔧 Gebäude reparieren.</li>
+        <li><b>Bauen</b>: Arbeiter wählen, Gebäude antippen, Vorschau verschieben und mit ✓ bestätigen.</li>
+      </ul>
+      <h3>Maus und Tastatur</h3>
+      <ul>
+        <li>Linksklick wählt, Ziehen zieht einen Rahmen, Rechtsklick gibt Befehle.</li>
+        <li>WASD oder Pfeiltasten scrollen, Mausrad zoomt, Leertaste pausiert.</li>
+        <li>Punkt wählt untätige Arbeiter, Komma die ganze Armee, H springt zur Burg.</li>
+      </ul>
+      <h3>Wirtschaft</h3>
+      <ul>
+        <li>🌾 Nahrung von Beerensträuchern und Feldern (Feld braucht eine Mühle).</li>
+        <li>🪵 Holz von Bäumen, 🪙 Gold und 🧱 Lehm aus Vorkommen.</li>
+        <li>Lager (Mühle, Holzlager, Grubenlager) nahe an Rohstoffen sparen Laufwege.</li>
+        <li>Jedes Haus erlaubt 5 weitere Einwohner.</li>
+      </ul>
+      <h3>Zeitalter</h3>
+      <p>Lehmzeit, Brennofenzeit, Bronzezeit und Kronenzeit. Der Aufstieg erfolgt in der Burg und schaltet neue Gebäude, Einheiten und Technologien frei.</p>
+      <h3>Einheiten</h3>
+      <ul>
+        <li>🔱 Speerträger schlagen Reiter. 🐎 Reiter schlagen Bogenschützen. 🏹 Bogenschützen schlagen Infanterie.</li>
+        <li>🐏 Rammböcke und ☄️ Triboks zerstören Gebäude. Der Tribok schießt aus großer Entfernung, ist aber wehrlos gegen Einheiten.</li>
+        <li>🗿 Tonkolosse sind die Elite der Kronenzeit.</li>
+        <li>🙏 Priester aus dem ⛪ Tempel heilen verletzte Einheiten und Arbeiter in der Nähe automatisch.</li>
+        <li>Militär marschiert in Formation: Nahkampf vorn, Fernkampf dahinter, Priester und Belagerung hinten. Die Gruppe läuft im Tempo der langsamsten Einheit.</li>
+      </ul>
+    </div>
+    <div class="actions"><button id="btn-help-close" class="big primary">Verstanden</button></div>
+  </div>
+</div>
+
+<div id="rotate-hint" class="hidden">📱↻ Für die beste Übersicht das Gerät quer halten.</div>
+
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
